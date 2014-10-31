@@ -9,7 +9,7 @@ You may need the followings to build the code:
 - Windows 64-bit
 - MS Visual Studio 2012
 - CUDA toolkit 6.5
-- Other dependencies which you can directly download from [here](http://dl.dropboxusercontent.com/u/3466743/caffe-vs2012/dependency-20140804.7z).
+- Other dependencies which you can directly download from [here](https://www.dropbox.com/s/t9r8cnz6tn6s8de/3rdparty.rar?dl=0).
 
 #### Build Steps
 Currently it can be built by VS2012 for x64 flatform only. This is because the dependencies mentioned above is cross-compiled to support x64 only. If you want to build on 32bit windows, you need to rebuild your own 3rd-party libraries.
