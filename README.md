@@ -9,7 +9,7 @@ You may need the followings to build the code:
 - Windows 64-bit
 - MS Visual Studio 2012
 - CUDA toolkit 6.5
-- Other dependencies which you can directly download from [here](https://www.dropbox.com/s/t9r8cnz6tn6s8de/3rdparty.rar?dl=0).
+- Other dependencies which you can directly download from [here](https://www.dropbox.com/s/bmqv4n5701qkfyd/3rdparty.rar?dl=0).
 
 #### Build Steps
 Currently it can be built by VS2012 for x64 flatform only. This is because the dependencies mentioned above is cross-compiled to support x64 only. If you want to build on 32bit windows, you need to rebuild your own 3rd-party libraries.
@@ -39,3 +39,8 @@ Currently it can be built by VS2012 for x64 flatform only. This is because the d
 - Please create new issues in [github](https://github.com/niuzhiheng/caffe/issues) if you find any bug.
 - If you have new pull requests, they are very welcome.
 - Before you do that, you may wish to read this [wiki page](https://github.com/niuzhiheng/caffe/wiki) for more information.
+
+
+Please let me know if you found issues.
+
+Thanks @happynear and NIU ZHIHENG (https://github.com/niuzhiheng/caffe)
