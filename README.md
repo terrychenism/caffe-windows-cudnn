@@ -17,7 +17,7 @@ Currently it can be built by VS2012 for x64 flatform only. This is because the d
 - Download the dependency file and extract the folders inside to project root directory.
 - Include any .cpp you want to build in the `./tools` directory to MainCaller.cpp.
 - Open the solution file in `./build/MSVC`
-- Switch build target to x64 platform (Just release mode is OK).
+- Switch build target to x64 platform (ONLY release mode is OK).
 - Build the code and you may find the `./bin/MainCaller.exe`
 
 #### Train MNIST dataset
