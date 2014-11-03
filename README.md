@@ -23,8 +23,9 @@ Currently it can be built by VS2012 for x64 flatform only. This is because the d
 #### Train MNIST dataset
 - Suppose you choose to build train_net.cpp which is the default one in MainCaller.cpp
 - If you do not have GPU, please change it to CPU in `lenet_solver.prototxt`
+- Add cudnn64_65.dll to `./bin/`
 - Goto directory `./examples/mnist`
-- Double click `get_mnist_leveldb.bat` to download the dataset in leveldb format.
+- Double click `get_mnist_leveldb.bat` to download the dataset in leveldb format.(ignore)
 - Double click `train_lenet.bat` to see the training progress .
 
 #### Tips
