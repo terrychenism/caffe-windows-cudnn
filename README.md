@@ -29,7 +29,7 @@ Currently it can be built by VS2012 for x64 flatform only. This is because the d
 - Double click `train_lenet.bat` to see the training progress .
 
 #### Performance
-- I have trained mnist on K40 with this windows version, take 50 seconds. The original windows-caffe taken about 5 minutes to train mnist. 
+- I have trained mnist on K40 with this windows version, take 40 seconds. The original windows-caffe taken about 5 minutes to train mnist. 
 
 #### Tips
 - It takes obvious longer time when you compile for the first time. Therefore please refrain from using `clean & rebuild`.
