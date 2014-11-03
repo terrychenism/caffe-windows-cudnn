@@ -28,6 +28,9 @@ Currently it can be built by VS2012 for x64 flatform only. This is because the d
 - Double click `get_mnist_leveldb.bat` to download the dataset in leveldb format.(ignore)
 - Double click `train_lenet.bat` to see the training progress .
 
+#### Performance
+- I have trained mnist on K40 with this windows version, take 50 seconds. The original windows-caffe taken about 5 minutes to train mnist. 
+
 #### Tips
 - It takes obvious longer time when you compile for the first time. Therefore please refrain from using `clean & rebuild`.
 - To support different [GPU compute capabilities](http://en.wikipedia.org/wiki/CUDA#Supported_GPUs), the code is built for several compute capability versions. If you know the exact version of your GPU device, you may remove the support to other versions to speed up the compiling procedure. You may wish to take a look at #25 for more details.
