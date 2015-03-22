@@ -775,19 +775,6 @@ void Net<Dtype>::Update() {
   }
 }
 
-// added for allowing bigger batch size
-template <typename Dtype>
-void Net<Dtype>::AccumulateDiff(){
-  for (int i = 0; i < params_.size(); ++i)
-    params_[i]->AccumulateDiff();
-}
-
-template <typename Dtype>
-void Net<Dtype>::UpdateDiff(){
-  for (int i = 0; i < params_.size(); ++i)
-    params_[i]->UpdateDiff();
-}
-
 template <typename Dtype>
 bool Net<Dtype>::has_blob(const string& blob_name) {
   return blob_names_index_.find(blob_name) != blob_names_index_.end();

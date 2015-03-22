@@ -80,14 +80,10 @@ class Blob {
   const Dtype* gpu_data() const;
   const Dtype* cpu_diff() const;
   const Dtype* gpu_diff() const;
-  const Dtype* cpu_acum_diff() const;
-  const Dtype* gpu_acum_diff() const;
   Dtype* mutable_cpu_data();
   Dtype* mutable_gpu_data();
   Dtype* mutable_cpu_diff();
   Dtype* mutable_gpu_diff();
-  Dtype* mutable_gpu_acum_diff();
-  Dtype* mutable_cpu_acum_diff();
   void Update();
   void FromProto(const BlobProto& proto);
   void ToProto(BlobProto* proto, bool write_diff = false) const;
@@ -96,10 +92,6 @@ class Blob {
   Dtype asum_data() const;
   /// @brief Compute the sum of absolute values (L1 norm) of the diff.
   Dtype asum_diff() const;
-
-  // added for allowing bigger batch_size
-  void AccumulateDiff();
-  void UpdateDiff();
 
   /**
    * @brief Set the data_ shared_ptr to point to the SyncedMemory holding the
@@ -123,7 +115,6 @@ class Blob {
  protected:
   shared_ptr<SyncedMemory> data_;
   shared_ptr<SyncedMemory> diff_;
-  shared_ptr<SyncedMemory> acum_diff_;
   int num_;
   int channels_;
   int height_;

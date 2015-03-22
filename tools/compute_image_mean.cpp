@@ -13,7 +13,6 @@
 using caffe::Datum;
 using caffe::BlobProto;
 using std::max;
-using std::string;
 
 int main(int argc, char** argv) {
   ::google::InitGoogleLogging(argv[0]);

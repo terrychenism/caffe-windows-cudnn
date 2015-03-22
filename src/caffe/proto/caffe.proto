@@ -39,23 +39,6 @@ message FillerParameter {
   // The expected number of non-zero input weights for a given output in
   // Gaussian filler -- the default -1 means don't perform sparsification.
   optional int32 sparse = 7 [default = -1];
-  // the negative slope of the leaky relu attached to the previous activation
-  optional float negative_slope = 8 [default = 0];
-  // Normalize the filler variance by fan_in, fan_out, or their average.
-  // Applies to xavier and relu fillers.
-  enum VarianceNorm {
-    FAN_IN = 0;
-    FAN_OUT = 1;
-    AVERAGE = 2;
-  }
-  optional VarianceNorm variance_norm = 9 [default = FAN_IN];
-  // Applies to xavier and relu fillers.
-  enum LayerType {
-    CONVOLUTION = 0;
-    INNER_PRODUCT = 1;
-  }
-  optional LayerType layer_type = 10 [default = CONVOLUTION];
-  optional string source = 11;
 }
 
 message NetParameter {
@@ -80,7 +63,7 @@ message NetParameter {
 // NOTE
 // Update the next available ID when you add a new SolverParameter field.
 //
-// SolverParameter next available ID: 36 (last added: rms_decay)
+// SolverParameter next available ID: 32 (last added: delta)
 message SolverParameter {
   //////////////////////////////////////////////////////////////////////////////
   // Specifying the train and test networks
@@ -130,8 +113,6 @@ message SolverParameter {
   // the number of iterations between displaying info. If display = 0, no info
   // will be displayed.
   optional int32 display = 6;
-  // Display the cost averaged over the last average_cost iterations
-  optional int32 average_loss = 34 [default = 1];
   optional int32 max_iter = 7; // the maximum number of iterations
   optional string lr_policy = 8; // The learning rate decay policy.
   optional float gamma = 9; // The parameter to compute the learning rate.
@@ -159,23 +140,17 @@ message SolverParameter {
   // random number generator -- useful for reproducible results. Otherwise,
   // (and by default) initialize using a seed derived from the system clock.
   optional int64 random_seed = 20 [default = -1];
-  // added to allow big batch_size
-  optional int32 update_interval = 33 [default = 1];
-  
+
   // Solver type
   enum SolverType {
     SGD = 0;
     NESTEROV = 1;
     ADAGRAD = 2;
-	ADADELTA = 3;
-	RMSPROP = 4;
   }
   optional SolverType solver_type = 30 [default = SGD];
   // numerical stability for AdaGrad
-  optional float delta = 31 [default = 1e-8];  
-  //RMSprop decay value
-  optional float rms_decay = 35;
-  
+  optional float delta = 31 [default = 1e-8];
+
   // If true, print information about the state of the net that may help with
   // debugging learning problems.
   optional bool debug_info = 23 [default = false];
@@ -244,7 +219,7 @@ message LayerParameter {
   // line above the enum. Update the next available ID when you add a new
   // LayerType.
   //
-  // LayerType next available ID: 40 (last added: BN)
+  // LayerType next available ID: 37 (last added: SILENCE)
   enum LayerType {
     // "NONE" layer type is 0th enum element so that we don't cause confusion
     // by defaulting to an existent LayerType (instead, should usually error if
@@ -253,10 +228,8 @@ message LayerParameter {
     ABSVAL = 35;
     ACCURACY = 1;
     ARGMAX = 30;
-	BN = 39;
     BNLL = 2;
     CONCAT = 3;
-	COMPACT_DATA = 37;
     CONVOLUTION = 4;
     DATA = 5;
     DROPOUT = 6;
@@ -277,7 +250,6 @@ message LayerParameter {
     MVN = 34;
     POOLING = 17;
     POWER = 26;
-	PRELU = 38;
     RELU = 18;
     SIGMOID = 19;
     SIGMOID_CROSS_ENTROPY_LOSS = 27;
@@ -318,8 +290,7 @@ message LayerParameter {
   repeated float loss_weight = 35;
 
   optional AccuracyParameter accuracy_param = 27;
-  optional ArgMaxParameter argmax_param = 23;  
-  optional BNParameter bn_param = 41;
+  optional ArgMaxParameter argmax_param = 23;
   optional ConcatParameter concat_param = 9;
   optional ConvolutionParameter convolution_param = 10;
   optional DataParameter data_param = 11;
@@ -337,15 +308,14 @@ message LayerParameter {
   optional MVNParameter mvn_param = 34;
   optional PoolingParameter pooling_param = 19;
   optional PowerParameter power_param = 21;
-  optional PReLUParameter prelu_param = 40;
   optional ReLUParameter relu_param = 30;
   optional SigmoidParameter sigmoid_param = 38;
   optional SoftmaxParameter softmax_param = 39;
   optional SliceParameter slice_param = 31;
   optional TanHParameter tanh_param = 37;
   optional ThresholdParameter threshold_param = 25;
-  optional WindowDataParameter window_data_param = 20; 
-  
+  optional WindowDataParameter window_data_param = 20;
+
   // Parameters for data pre-processing.
   optional TransformationParameter transform_param = 36;
 
@@ -372,22 +342,6 @@ message TransformationParameter {
   // Specify if we would like to randomly crop an image.
   optional uint32 crop_size = 3 [default = 0];
   optional string mean_file = 4;
-  optional bool multiscale = 5 [default = false];
-  // Specify the range of scaling factor for doing resizing
-  optional float min_scaling_factor = 6 [default = 0.75];
-  optional float max_scaling_factor = 7 [default = 1.50];
-  // Specify the angle interval for doing rotation
-  optional float angle_interval = 8 [default = 1];
-  // Specify the shearing ratio
-  optional float max_shearing_ratio = 9 [default = 0.125];
-  // Specify the perspective ratio
-  optional float max_perspective_ratio = 10 [default = 0.125];
-  // Specify the constant value we would like to fill with when doing affine transformation
-  optional float warp_fillval = 11 [default = 255];
-  optional bool debug_display = 12 [default = false];
-  optional bool contrast_adjustment = 13 [default = false];
-  optional bool smooth_filtering = 14 [default = false];
-  optional bool jpeg_compression = 15 [default = false];
 }
 
 // Message that stores parameters used by AccuracyLayer
@@ -496,7 +450,6 @@ message EltwiseParameter {
   enum EltwiseOp {
     PROD = 0;
     SUM = 1;
-	MAX = 2;
   }
   optional EltwiseOp operation = 1 [default = SUM]; // element-wise operation
   repeated float coeff = 2; // blob-wise coefficient for SUM operation
@@ -605,15 +558,6 @@ message MVNParameter {
   optional bool across_channels = 2 [default = false];
 }
 
-// Message that stores parameters used by BNLayer
-message BNParameter {
-  optional FillerParameter scale_filler = 1; // The filler for the scale
-  optional FillerParameter shift_filler = 2; // The filler for the shift
-  optional float var_eps = 3 [default = 1e-10]; // The epsilon added to variance
-  optional bool moving_average = 4 [default = false]; // whether or not using moving average for inference
-  optional float decay = 5 [default = 0.95]; // The decay factor for moving average
-}
-
 // Message that stores parameters used by PoolingLayer
 message PoolingParameter {
   enum PoolMethod {
@@ -647,17 +591,6 @@ message PowerParameter {
   optional float power = 1 [default = 1.0];
   optional float scale = 2 [default = 1.0];
   optional float shift = 3 [default = 0.0];
-}
-
-// Message that stores parameters used by PReLULayer
-message PReLUParameter {
-  // Parametric ReLU described in K. He et al, Delving Deep into Rectifiers:
-  // Surpassing Human-Level Performance on ImageNet Classification, 2015.
-
-  // Initial value of a_i. Set as a_i=init_value for all channel i.
-  optional float init_value = 1 [default = 0.25];
-  // Whether or not slope paramters are shared across channels.
-  optional bool channel_shared = 2 [default = false];
 }
 
 // Message that stores parameters used by ReLULayer

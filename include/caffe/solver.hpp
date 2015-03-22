@@ -125,42 +125,6 @@ class AdaGradSolver : public SGDSolver<Dtype> {
 };
 
 template <typename Dtype>
-class AdaDeltaSolver : public SGDSolver<Dtype> {
- public:
-  explicit AdaDeltaSolver(const SolverParameter& param)
-      : SGDSolver<Dtype>(param) { constructor_sanity_check(); }
-  explicit AdaDeltaSolver(const string& param_file)
-      : SGDSolver<Dtype>(param_file) { constructor_sanity_check(); }
-
- protected:
-  virtual void PreSolve();
-  virtual void ComputeUpdateValue();
-  void constructor_sanity_check() {
-	// comment out by Denny for allowing learning rate
-    //CHECK_EQ(0, this->param_.base_lr())
-    //    << "Learning rate cannot be used with AdaDelta.";
-    //CHECK_EQ("", this->param_.lr_policy())
-    //    << "Learning rate policy cannot be applied to AdaDelta.";
-  }
-
-  DISABLE_COPY_AND_ASSIGN(AdaDeltaSolver);
-};
-
-template <typename Dtype>
-class RMSpropSolver : public SGDSolver<Dtype> {
-public:
-	explicit RMSpropSolver(const SolverParameter& param)
-		: SGDSolver<Dtype>(param) {  }
-	explicit RMSpropSolver(const string& param_file)
-		: SGDSolver<Dtype>(param_file) { }
-
-protected:
-	virtual void ComputeUpdateValue();
-
-	DISABLE_COPY_AND_ASSIGN(RMSpropSolver);
-};
-
-template <typename Dtype>
 Solver<Dtype>* GetSolver(const SolverParameter& param) {
   SolverParameter_SolverType type = param.solver_type();
 
@@ -171,10 +135,6 @@ Solver<Dtype>* GetSolver(const SolverParameter& param) {
       return new NesterovSolver<Dtype>(param);
   case SolverParameter_SolverType_ADAGRAD:
       return new AdaGradSolver<Dtype>(param);
-  case SolverParameter_SolverType_ADADELTA:
-      return new AdaDeltaSolver<Dtype>(param);
-  case SolverParameter_SolverType_RMSPROP:
-	  return new RMSpropSolver<Dtype>(param);
   default:
       LOG(FATAL) << "Unknown SolverType: " << type;
   }

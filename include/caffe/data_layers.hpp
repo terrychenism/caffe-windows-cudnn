@@ -301,38 +301,6 @@ class MemoryDataLayer : public BaseDataLayer<Dtype> {
   bool has_new_data_;
 };
 
-template <typename Dtype>
-class CompactDataLayer : public BasePrefetchingDataLayer<Dtype> {
- public:
-  explicit CompactDataLayer(const LayerParameter& param)
-      : BasePrefetchingDataLayer<Dtype>(param) {}
-  virtual ~CompactDataLayer();
-  virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
-      vector<Blob<Dtype>*>* top);
-  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
-      vector<Blob<Dtype>*>* top);
-
-  virtual inline LayerParameter_LayerType type() const {
-    return LayerParameter_LayerType_DATA;
-  }
-  virtual inline int ExactNumBottomBlobs() const { return 0; }
-  virtual inline int MinTopBlobs() const { return 1; }
-  virtual inline int MaxTopBlobs() const { return 2; }
-
- protected:
-  virtual void InternalThreadEntry();
-
-  // LEVELDB
-  shared_ptr<leveldb::DB> db_;
-  shared_ptr<leveldb::Iterator> iter_;
-  // LMDB
-  MDB_env* mdb_env_;
-  MDB_dbi mdb_dbi_;
-  MDB_txn* mdb_txn_;
-  MDB_cursor* mdb_cursor_;
-  MDB_val mdb_key_, mdb_value_;
-};
-
 /**
  * @brief Provides data to the Net from windows of images files, specified
  *        by a window data file.
