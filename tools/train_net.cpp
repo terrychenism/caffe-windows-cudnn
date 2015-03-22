@@ -22,6 +22,9 @@ int main(int argc, char** argv) {
   }
   SolverParameter solver_param;
   ReadProtoFromTextFileOrDie(argv[1], &solver_param);
+  if(solver_param.solver_mode()==1) {
+	Caffe::set_mode(Caffe::GPU);
+  }
 
   LOG(INFO) << "Starting Optimization";
   SGDSolver<float> solver(solver_param);
