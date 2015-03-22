@@ -148,8 +148,38 @@ class XavierFiller : public Filler<Dtype> {
       : Filler<Dtype>(param) {}
   virtual void Fill(Blob<Dtype>* blob) {
     CHECK(blob->count());
-    int fan_in = blob->count() / blob->num();
-    Dtype scale = sqrt(Dtype(3) / fan_in);
+	// figure out fan_in and fan_out
+	int fan_in, fan_out;
+	switch (this->filler_param_.layer_type()) {
+	case FillerParameter_LayerType_CONVOLUTION:
+		// for CONVOLUTION layer: output x input/group x height x width
+		fan_in = blob->count() / blob->num();
+		fan_out = blob->count() / blob->channels();
+		break;
+	case FillerParameter_LayerType_INNER_PRODUCT:
+		// for INNERPRODUCT layer: 1 x 1 x output x input
+		fan_in = blob->width();
+		fan_out = blob->height();
+		break;
+	default:
+		LOG(FATAL) << "Unknown layer type.";
+	}
+	// figure out n
+	Dtype n;
+	switch (this->filler_param_.variance_norm()) {
+	case FillerParameter_VarianceNorm_FAN_IN:
+		n = fan_in;
+		break;
+	case FillerParameter_VarianceNorm_FAN_OUT:
+		n = fan_out;
+		break;
+	case FillerParameter_VarianceNorm_AVERAGE:
+		n = (fan_in + fan_out) / Dtype(2);
+		break;
+	default:
+		LOG(FATAL) << "Unknown variance normalizatoin operation.";
+	}
+    Dtype scale = sqrt(Dtype(3) / n);
     caffe_rng_uniform<Dtype>(blob->count(), -scale, scale,
         blob->mutable_cpu_data());
     CHECK_EQ(this->filler_param_.sparse(), -1)
@@ -157,6 +187,57 @@ class XavierFiller : public Filler<Dtype> {
   }
 };
 
+/**
+ * @brief Fills a Blob with values @f$ x \sim N(-a, +a) @f$ where @f$ a @f$ is
+ *        set by the number of incoming nodes, based on the paper [He,
+ *        Zhang, Ren and Sun 2015]
+ */
+template <typename Dtype>
+class MSRAFiller : public Filler<Dtype> {
+public:
+	explicit MSRAFiller(const FillerParameter& param)
+		: Filler<Dtype>(param) {}
+	virtual void Fill(Blob<Dtype>* blob) {
+		CHECK(blob->count());
+		Dtype a = Dtype(this->filler_param_.negative_slope());
+		// figure out fan_in and fan_out
+		int fan_in, fan_out;
+		switch (this->filler_param_.layer_type()) {
+		case FillerParameter_LayerType_CONVOLUTION:
+			// for CONVOLUTION layer: output x input/group x height x width
+			fan_in = blob->count() / blob->num();
+			fan_out = blob->count() / blob->channels();
+			break;
+		case FillerParameter_LayerType_INNER_PRODUCT:
+			// for INNERPRODUCT layer: 1 x 1 x output x input
+			fan_in = blob->width();
+			fan_out = blob->height();
+			break;
+		default:
+			LOG(FATAL) << "Unknown layer type.";
+		}
+		// figure out n
+		Dtype n;
+		switch (this->filler_param_.variance_norm()) {
+		case FillerParameter_VarianceNorm_FAN_IN:
+			n = fan_in;
+			break;
+		case FillerParameter_VarianceNorm_FAN_OUT:
+			n = fan_out;
+			break;
+		case FillerParameter_VarianceNorm_AVERAGE:
+			n = (fan_in + fan_out) / Dtype(2);
+			break;
+		default:
+			LOG(FATAL) << "Unknown variance normalizatoin operation.";
+		}
+		Dtype std = sqrt(Dtype(2) / (Dtype(1) + a * a) / n);
+		caffe_rng_gaussian<Dtype>(blob->count(), Dtype(this->filler_param_.mean()),
+			std, blob->mutable_cpu_data());
+		CHECK_EQ(this->filler_param_.sparse(), -1)
+			<< "Sparsity not supported by this Filler.";
+	}
+};
 
 /**
  * @brief Get a specific filler from the specification given in FillerParameter.
@@ -177,6 +258,8 @@ Filler<Dtype>* GetFiller(const FillerParameter& param) {
     return new UniformFiller<Dtype>(param);
   } else if (type == "xavier") {
     return new XavierFiller<Dtype>(param);
+  } else if (type == "msra") {
+	return new MSRAFiller<Dtype>(param);
   } else {
     CHECK(false) << "Unknown filler name: " << param.type();
   }

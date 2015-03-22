@@ -20,6 +20,8 @@ void Blob<Dtype>::Reshape(const int num, const int channels, const int height,
   if (count_) {
     data_.reset(new SyncedMemory(count_ * sizeof(Dtype)));
     diff_.reset(new SyncedMemory(count_ * sizeof(Dtype)));
+	if (Caffe::accumulate())
+		acum_diff_.reset(new SyncedMemory(count_ * sizeof(Dtype)));
   } else {
     data_.reset(reinterpret_cast<SyncedMemory*>(NULL));
     diff_.reset(reinterpret_cast<SyncedMemory*>(NULL));
@@ -62,9 +64,21 @@ const Dtype* Blob<Dtype>::cpu_diff() const {
 }
 
 template <typename Dtype>
+const Dtype* Blob<Dtype>::cpu_acum_diff() const{
+  CHECK(acum_diff_);
+  return (const Dtype*)acum_diff_->cpu_data();
+}
+
+template <typename Dtype>
 const Dtype* Blob<Dtype>::gpu_diff() const {
   CHECK(diff_);
   return (const Dtype*)diff_->gpu_data();
+}
+
+template <typename Dtype>
+const Dtype* Blob<Dtype>::gpu_acum_diff() const{
+  CHECK(acum_diff_);
+  return (const Dtype*)acum_diff_->gpu_data();
 }
 
 template <typename Dtype>
@@ -86,9 +100,21 @@ Dtype* Blob<Dtype>::mutable_cpu_diff() {
 }
 
 template <typename Dtype>
+Dtype* Blob<Dtype>::mutable_cpu_acum_diff(){
+  CHECK(acum_diff_);
+  return static_cast<Dtype*>(acum_diff_->mutable_cpu_data());
+}
+
+template <typename Dtype>
 Dtype* Blob<Dtype>::mutable_gpu_diff() {
   CHECK(diff_);
   return static_cast<Dtype*>(diff_->mutable_gpu_data());
+}
+
+template <typename Dtype>
+Dtype* Blob<Dtype>::mutable_gpu_acum_diff(){
+  CHECK(acum_diff_);
+  return static_cast<Dtype*>(acum_diff_->mutable_gpu_data());
 }
 
 template <typename Dtype>
@@ -126,6 +152,81 @@ void Blob<Dtype>::Update() {
     caffe_gpu_axpy<Dtype>(count_, Dtype(-1),
         static_cast<const Dtype*>(diff_->gpu_data()),
         static_cast<Dtype*>(data_->mutable_gpu_data()));
+#else
+    NO_GPU;
+#endif
+    break;
+  default:
+    LOG(FATAL) << "Syncedmem not initialized.";
+  }
+}
+
+// added for allowing bigger batch_size
+template <> void Blob<unsigned int>::AccumulateDiff(){
+  NOT_IMPLEMENTED;
+  return;
+}
+
+template <> void Blob<int>::AccumulateDiff(){
+  NOT_IMPLEMENTED;
+  return;
+}
+
+template <typename Dtype>
+void Blob<Dtype>::AccumulateDiff(){
+  switch (data_->head()){
+  case SyncedMemory::HEAD_AT_CPU:
+    // perform computation on CPU
+    caffe_axpy<Dtype>(count_, Dtype(1.0),
+      static_cast<const Dtype*>(diff_->cpu_data()),
+      static_cast<Dtype*>(acum_diff_->mutable_cpu_data()));
+    break;
+  case SyncedMemory::HEAD_AT_GPU:
+  case SyncedMemory::SYNCED:
+#ifndef CPU_ONLY
+    // perform computation on GPU
+    caffe_gpu_axpy<Dtype>(count_, Dtype(1.0),
+      static_cast<const Dtype*>(diff_->gpu_data()),
+      static_cast<Dtype*>(acum_diff_->mutable_gpu_data()));
+#else
+    NO_GPU;
+#endif
+    break;
+  default:
+    LOG(FATAL) << "Syncedmem not initialized.";
+  }
+}
+
+template <> void Blob<unsigned int>::UpdateDiff(){
+  NOT_IMPLEMENTED;
+  return;
+}
+
+template <> void Blob<int>::UpdateDiff(){
+  NOT_IMPLEMENTED;
+  return;
+}
+
+template <typename Dtype>
+void Blob<Dtype>::UpdateDiff(){
+  switch (data_->head()){
+  case SyncedMemory::HEAD_AT_CPU:
+    // perform computation on CPU
+    caffe_axpy<Dtype>(count_, Dtype(1.0),
+      static_cast<const Dtype*>(acum_diff_->cpu_data()),
+      static_cast<Dtype*>(diff_->mutable_cpu_data()));
+    caffe_memset(sizeof(Dtype)*count_, 0,
+      acum_diff_->mutable_cpu_data());
+    break;
+  case SyncedMemory::HEAD_AT_GPU:
+  case SyncedMemory::SYNCED:
+#ifndef CPU_ONLY
+    // perform computation on GPU
+    caffe_gpu_axpy<Dtype>(count_, Dtype(1.0),
+      static_cast<const Dtype*>(acum_diff_->gpu_data()),
+      static_cast<Dtype*>(diff_->mutable_gpu_data()));
+    caffe_gpu_memset(sizeof(Dtype)*count_, 0,
+      acum_diff_->mutable_gpu_data());
 #else
     NO_GPU;
 #endif

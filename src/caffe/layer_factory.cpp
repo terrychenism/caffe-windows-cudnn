@@ -185,8 +185,12 @@ Layer<Dtype>* GetLayer(const LayerParameter& param) {
     return new AbsValLayer<Dtype>(param);
   case LayerParameter_LayerType_ARGMAX:
     return new ArgMaxLayer<Dtype>(param);
+  case LayerParameter_LayerType_BN:
+	  return new BNLayer<Dtype>(param);
   case LayerParameter_LayerType_BNLL:
     return new BNLLLayer<Dtype>(param);
+  case LayerParameter_LayerType_COMPACT_DATA:
+    return new CompactDataLayer<Dtype>(param);
   case LayerParameter_LayerType_CONCAT:
     return new ConcatLayer<Dtype>(param);
   case LayerParameter_LayerType_CONVOLUTION:
@@ -222,13 +226,15 @@ Layer<Dtype>* GetLayer(const LayerParameter& param) {
   case LayerParameter_LayerType_MEMORY_DATA:
     return new MemoryDataLayer<Dtype>(param);
   case LayerParameter_LayerType_MVN:
-    return new MVNLayer<Dtype>(param);
+	return new MVNLayer<Dtype>(param);
   case LayerParameter_LayerType_MULTINOMIAL_LOGISTIC_LOSS:
     return new MultinomialLogisticLossLayer<Dtype>(param);
   case LayerParameter_LayerType_POOLING:
     return GetPoolingLayer<Dtype>(name, param);
   case LayerParameter_LayerType_POWER:
     return new PowerLayer<Dtype>(param);
+  case LayerParameter_LayerType_PRELU:
+	return new PReLULayer<Dtype>(param);
   case LayerParameter_LayerType_RELU:
     return GetReLULayer<Dtype>(name, param);
   case LayerParameter_LayerType_SILENCE:

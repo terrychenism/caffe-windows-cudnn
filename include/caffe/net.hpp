@@ -77,6 +77,9 @@ class Net {
   /// @brief Updates the network weights based on the diff values computed.
   void Update();
 
+  // added for allowing large batch size
+  void AccumulateDiff();
+  void UpdateDiff();
   /**
    * @brief For an already initialized net, implicitly copies (i.e., using no
    *        additional memory) the pre-trained layers from another Net.

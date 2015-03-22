@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -200,7 +200,7 @@ cd %origin_dir%</Command>
     </Midl>
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
-      <AdditionalIncludeDirectories>../../3rdparty/include;../../3rdparty/include/eigen3/Eigen;../../src;../../include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../3rdparty/include;../../3rdparty/include/eigen3/Eigen;../../src;../../include;F:\Program Files\MATLAB\R2014a\extern\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_VARIADIC_MAX=10;WIN32;NDEBUG;_CONSOLE;USE_CUDNN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader />
@@ -216,7 +216,7 @@ cd %origin_dir%</Command>
       <DataExecutionPrevention />
       <TargetMachine>MachineX64</TargetMachine>
       <AdditionalLibraryDirectories>../../3rdparty/lib;F:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v6.5\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libboost_date_time-vc110-mt-s-1_55.lib;cudnn64_65.lib;cudnn.lib;shlwapi.lib;leveldb.lib;libopenblas.lib;cublas.lib;cublas_device.lib;curand.lib;cudart.lib;cuda.lib;libprotobuf.lib;libglog.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;hdf5.lib;hdf5_hl.lib;lmdb.lib;libgflags.lib;opencv_calib3d248.lib;opencv_contrib248.lib;opencv_core248.lib;opencv_features2d248.lib;opencv_flann248.lib;opencv_gpu248.lib;opencv_highgui248.lib;opencv_imgproc248.lib;opencv_legacy248.lib;opencv_ml248.lib;opencv_nonfree248.lib;opencv_objdetect248.lib;opencv_photo248.lib;opencv_stitching248.lib;opencv_ts248.lib;opencv_video248.lib;opencv_videostab248.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libboost_date_time-vc110-mt-s-1_55.lib;libmex.lib;libmx.lib;cudnn64_65.lib;cudnn.lib;shlwapi.lib;leveldb.lib;libopenblas.lib;cublas.lib;cublas_device.lib;curand.lib;cudart.lib;cuda.lib;libprotobuf.lib;libglog.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;hdf5.lib;hdf5_hl.lib;lmdb.lib;libgflags.lib;opencv_calib3d248.lib;opencv_contrib248.lib;opencv_core248.lib;opencv_features2d248.lib;opencv_flann248.lib;opencv_gpu248.lib;opencv_highgui248.lib;opencv_imgproc248.lib;opencv_legacy248.lib;opencv_ml248.lib;opencv_nonfree248.lib;opencv_objdetect248.lib;opencv_photo248.lib;opencv_stitching248.lib;opencv_ts248.lib;opencv_video248.lib;opencv_videostab248.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy ..\..\3rdparty\bin\opencv_core* ..\..\bin\
@@ -250,6 +250,8 @@ cd %origin_dir%</Command>
     <ClCompile Include="..\..\src\caffe\layers\argmax_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\base_data_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\bnll_layer.cpp" />
+    <ClCompile Include="..\..\src\caffe\layers\bn_layer.cpp" />
+    <ClCompile Include="..\..\src\caffe\layers\compact_data_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\concat_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\conv_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\cudnn_conv_layer.cpp" />
@@ -279,6 +281,7 @@ cd %origin_dir%</Command>
     <ClCompile Include="..\..\src\caffe\layers\neuron_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\pooling_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\power_layer.cpp" />
+    <ClCompile Include="..\..\src\caffe\layers\prelu_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\relu_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\sigmoid_cross_entropy_loss_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\sigmoid_layer.cpp" />
@@ -293,6 +296,7 @@ cd %origin_dir%</Command>
     <ClCompile Include="..\..\src\caffe\layer_factory.cpp" />
     <ClCompile Include="..\..\src\caffe\net.cpp" />
     <ClCompile Include="..\..\src\caffe\proto\caffe.pb.cc" />
+    <ClCompile Include="..\..\src\caffe\proto\caffe_pretty_print.pb.cc" />
     <ClCompile Include="..\..\src\caffe\solver.cpp" />
     <ClCompile Include="..\..\src\caffe\syncedmem.cpp" />
     <ClCompile Include="..\..\src\caffe\util\benchmark.cpp" />
@@ -300,17 +304,20 @@ cd %origin_dir%</Command>
     <ClCompile Include="..\..\src\caffe\util\insert_splits.cpp" />
     <ClCompile Include="..\..\src\caffe\util\io.cpp" />
     <ClCompile Include="..\..\src\caffe\util\math_functions.cpp" />
+    <ClCompile Include="..\..\src\caffe\util\opencv_util.cpp" />
     <ClCompile Include="..\..\src\caffe\util\upgrade_proto.cpp" />
     <ClCompile Include="..\..\src\gtest\gtest-all.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\caffe\proto\caffe.pb.h" />
+    <ClInclude Include="..\..\src\caffe\proto\caffe_pretty_print.pb.h" />
     <ClInclude Include="..\..\src\include\opencvlib.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="..\..\src\caffe\layers\absval_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\base_data_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\bnll_layer.cu" />
+    <CudaCompile Include="..\..\src\caffe\layers\bn_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\concat_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\conv_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\cudnn_conv_layer.cu" />
@@ -331,6 +338,7 @@ cd %origin_dir%</Command>
     <CudaCompile Include="..\..\src\caffe\layers\mvn_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\pooling_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\power_layer.cu" />
+    <CudaCompile Include="..\..\src\caffe\layers\prelu_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\relu_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\sigmoid_cross_entropy_loss_layer.cu" />
     <CudaCompile Include="..\..\src\caffe\layers\sigmoid_layer.cu" />

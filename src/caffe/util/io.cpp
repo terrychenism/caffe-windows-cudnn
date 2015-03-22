@@ -122,7 +122,7 @@ leveldb::Options GetLevelDBOptions() {
   // In default, we will return the leveldb option and set the max open files
   // in order to avoid using up the operating system's limit.
   leveldb::Options options;
-  options.max_open_files = 100;
+  options.max_open_files = 10;
   return options;
 }
 

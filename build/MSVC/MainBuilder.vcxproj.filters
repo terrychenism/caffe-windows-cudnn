@@ -4,7 +4,6 @@
     <ClCompile Include="..\..\examples\MainCaller.cpp" />
     <ClCompile Include="..\..\src\caffe\blob.cpp" />
     <ClCompile Include="..\..\src\caffe\common.cpp" />
-    <ClCompile Include="..\..\src\caffe\layers\memory_data_layer.cpp" />
     <ClCompile Include="..\..\src\caffe\layer_factory.cpp" />
     <ClCompile Include="..\..\src\caffe\net.cpp" />
     <ClCompile Include="..\..\src\caffe\solver.cpp" />
@@ -13,6 +12,26 @@
     <ClCompile Include="..\..\src\caffe\proto\caffe.pb.cc">
       <Filter>proto</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\caffe\util\benchmark.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\util\im2col.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\util\insert_splits.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\util\io.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\util\math_functions.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\util\upgrade_proto.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\data_transformer.cpp" />
+    <ClCompile Include="..\..\src\caffe\internal_thread.cpp" />
     <ClCompile Include="..\..\src\caffe\layers\absval_layer.cpp">
       <Filter>layers</Filter>
     </ClCompile>
@@ -25,7 +44,13 @@
     <ClCompile Include="..\..\src\caffe\layers\base_data_layer.cpp">
       <Filter>layers</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\caffe\layers\bn_layer.cpp">
+      <Filter>layers</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\caffe\layers\bnll_layer.cpp">
+      <Filter>layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\layers\compact_data_layer.cpp">
       <Filter>layers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\caffe\layers\concat_layer.cpp">
@@ -97,6 +122,9 @@
     <ClCompile Include="..\..\src\caffe\layers\lrn_layer.cpp">
       <Filter>layers</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\caffe\layers\memory_data_layer.cpp">
+      <Filter>layers</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\caffe\layers\multinomial_logistic_loss_layer.cpp">
       <Filter>layers</Filter>
     </ClCompile>
@@ -110,6 +138,9 @@
       <Filter>layers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\caffe\layers\power_layer.cpp">
+      <Filter>layers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\layers\prelu_layer.cpp">
       <Filter>layers</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\caffe\layers\relu_layer.cpp">
@@ -145,30 +176,19 @@
     <ClCompile Include="..\..\src\caffe\layers\window_data_layer.cpp">
       <Filter>layers</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\caffe\util\benchmark.cpp">
+    <ClCompile Include="..\..\src\caffe\proto\caffe_pretty_print.pb.cc">
+      <Filter>proto</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\caffe\util\opencv_util.cpp">
       <Filter>util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\caffe\util\im2col.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\caffe\util\insert_splits.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\caffe\util\io.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\caffe\util\math_functions.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\caffe\util\upgrade_proto.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\caffe\data_transformer.cpp" />
-    <ClCompile Include="..\..\src\caffe\internal_thread.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\include\opencvlib.h" />
     <ClInclude Include="..\..\src\caffe\proto\caffe.pb.h">
+      <Filter>proto</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\caffe\proto\caffe_pretty_print.pb.h">
       <Filter>proto</Filter>
     </ClInclude>
   </ItemGroup>
@@ -176,18 +196,27 @@
     <Filter Include="proto">
       <UniqueIdentifier>{67a44105-4ff1-4536-bf79-0ef8809bc051}</UniqueIdentifier>
     </Filter>
-    <Filter Include="layers">
-      <UniqueIdentifier>{c547d6ae-850b-4e7e-91b2-bd7413cec628}</UniqueIdentifier>
-    </Filter>
     <Filter Include="util">
       <UniqueIdentifier>{9a8bca9f-8bcc-40c3-8bb7-edf0509134c1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="layers">
+      <UniqueIdentifier>{a12dabf5-18fd-4580-8e5d-bc59d91d5bca}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="..\..\src\caffe\util\im2col.cu">
+      <Filter>util</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\caffe\util\math_functions.cu">
+      <Filter>util</Filter>
+    </CudaCompile>
     <CudaCompile Include="..\..\src\caffe\layers\absval_layer.cu">
       <Filter>layers</Filter>
     </CudaCompile>
     <CudaCompile Include="..\..\src\caffe\layers\base_data_layer.cu">
+      <Filter>layers</Filter>
+    </CudaCompile>
+    <CudaCompile Include="..\..\src\caffe\layers\bn_layer.cu">
       <Filter>layers</Filter>
     </CudaCompile>
     <CudaCompile Include="..\..\src\caffe\layers\bnll_layer.cu">
@@ -253,6 +282,9 @@
     <CudaCompile Include="..\..\src\caffe\layers\power_layer.cu">
       <Filter>layers</Filter>
     </CudaCompile>
+    <CudaCompile Include="..\..\src\caffe\layers\prelu_layer.cu">
+      <Filter>layers</Filter>
+    </CudaCompile>
     <CudaCompile Include="..\..\src\caffe\layers\relu_layer.cu">
       <Filter>layers</Filter>
     </CudaCompile>
@@ -282,12 +314,6 @@
     </CudaCompile>
     <CudaCompile Include="..\..\src\caffe\layers\threshold_layer.cu">
       <Filter>layers</Filter>
-    </CudaCompile>
-    <CudaCompile Include="..\..\src\caffe\util\im2col.cu">
-      <Filter>util</Filter>
-    </CudaCompile>
-    <CudaCompile Include="..\..\src\caffe\util\math_functions.cu">
-      <Filter>util</Filter>
     </CudaCompile>
   </ItemGroup>
 </Project>
