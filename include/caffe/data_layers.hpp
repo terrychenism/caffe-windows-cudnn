@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "boost/scoped_ptr.hpp"
-#include "hdf5.h"
+#include "hdf5/hdf5.h"
 
 #include "caffe/blob.hpp"
 #include "caffe/common.hpp"
@@ -14,7 +14,6 @@
 #include "caffe/filler.hpp"
 #include "caffe/internal_thread.hpp"
 #include "caffe/layer.hpp"
-#include "caffe/net.hpp"
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/db.hpp"
 
@@ -29,7 +28,6 @@ template <typename Dtype>
 class BaseDataLayer : public Layer<Dtype> {
  public:
   explicit BaseDataLayer(const LayerParameter& param);
-  virtual ~BaseDataLayer() {}
   // LayerSetUp: implements common data layer setup functionality, and calls
   // DataLayerSetUp to do special data layer setup for individual layer types.
   // This method may not be overridden except by the BasePrefetchingDataLayer.
@@ -50,6 +48,13 @@ class BaseDataLayer : public Layer<Dtype> {
   TransformationParameter transform_param_;
   shared_ptr<DataTransformer<Dtype> > data_transformer_;
   bool output_labels_;
+  int datum_channels_;
+  int datum_height_;
+  int datum_width_;
+  int datum_size_;
+  Blob<Dtype> data_mean_;
+  const Dtype* mean_;
+
 };
 
 template <typename Dtype>
@@ -58,7 +63,6 @@ class BasePrefetchingDataLayer :
  public:
   explicit BasePrefetchingDataLayer(const LayerParameter& param)
       : BaseDataLayer<Dtype>(param) {}
-  virtual ~BasePrefetchingDataLayer() {}
   // LayerSetUp: implements common data layer setup functionality, and calls
   // DataLayerSetUp to do special data layer setup for individual layer types.
   // This method may not be overridden.
@@ -171,6 +175,8 @@ class HDF5DataLayer : public Layer<Dtype> {
   unsigned int current_file_;
   hsize_t current_row_;
   std::vector<shared_ptr<Blob<Dtype> > > hdf_blobs_;
+  std::vector<unsigned int> data_permutation_;
+  std::vector<unsigned int> file_permutation_;
 };
 
 /**
@@ -285,6 +291,53 @@ class MemoryDataLayer : public BaseDataLayer<Dtype> {
   Blob<Dtype> added_data_;
   Blob<Dtype> added_label_;
   bool has_new_data_;
+};
+
+
+template <typename Dtype>
+class CompactDataLayer : public BasePrefetchingDataLayer<Dtype> {
+public:
+	/*explicit CompactDataLayer(const LayerParameter& param)
+		: BasePrefetchingDataLayer<Dtype>(param) {}
+	virtual ~CompactDataLayer();
+	virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+	vector<Blob<Dtype>*>* top);
+	virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+	vector<Blob<Dtype>*>* top);
+	virtual inline LayerParameter_LayerType type() const {
+	return LayerParameter_LayerType_DATA;*/
+
+	explicit CompactDataLayer(const LayerParameter& param)
+		: BasePrefetchingDataLayer<Dtype>(param) {}
+	virtual ~CompactDataLayer();
+	virtual void DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
+		const vector<Blob<Dtype>*>& top);
+	virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+		const vector<Blob<Dtype>*>& top);
+
+	virtual inline const char* type() const { return "CompactData"; }
+	virtual inline int ExactNumBottomBlobs() const { return 0; }
+	virtual inline int MinTopBlobs() const { return 1; }
+	virtual inline int MaxTopBlobs() const { return 2; }
+
+protected:
+	virtual void InternalThreadEntry();
+
+	// LEVELDB
+	//shared_ptr<leveldb::DB> db_;
+	//shared_ptr<leveldb::Iterator> iter_;
+	shared_ptr<db::DB> db_;
+	shared_ptr<db::Cursor> cursor_;
+
+	// LMDB
+	MDB_env* mdb_env_;
+	MDB_dbi mdb_dbi_;
+	MDB_txn* mdb_txn_;
+	MDB_cursor* mdb_cursor_;
+	MDB_val mdb_key_, mdb_value_;
+
+	
+
 };
 
 /**

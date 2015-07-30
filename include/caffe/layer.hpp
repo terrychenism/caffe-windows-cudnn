@@ -3,19 +3,15 @@
 
 #include <algorithm>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "caffe/blob.hpp"
 #include "caffe/common.hpp"
 #include "caffe/layer_factory.hpp"
 #include "caffe/proto/caffe.pb.h"
-#include "caffe/util/coords.hpp"
 #include "caffe/util/device_alternate.hpp"
 
 namespace caffe {
-
-template <typename Dtype> class Net;
 
 /**
  * @brief An interface for the units of computation which can be composed into a
@@ -289,16 +285,6 @@ class Layer {
     param_propagate_down_[param_id] = value;
   }
 
-  virtual DiagonalAffineMap<Dtype> coord_map() {
-    NOT_IMPLEMENTED;
-    // suppress warnings
-    return DiagonalAffineMap<Dtype>(vector<pair<Dtype, Dtype> >());
-  }
-
-  /**
-   * @brief Used by Net to give layers a pointer to their owning net.
-   */
-  void set_net(Net<Dtype>* net) { net_ = net; }
 
  protected:
   /** The protobuf that stores the layer parameters */
@@ -313,9 +299,6 @@ class Layer {
   /** The vector that indicates whether each top blob has a non-zero weight in
    *  the objective function. */
   vector<Dtype> loss_;
-
-  /** The net to which this layer belongs. */
-  Net<Dtype>* net_;
 
   /** @brief Using the CPU device, compute the layer output. */
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -423,6 +406,7 @@ template <typename Dtype>
 inline Dtype Layer<Dtype>::Forward(const vector<Blob<Dtype>*>& bottom,
     const vector<Blob<Dtype>*>& top) {
   Dtype loss = 0;
+  Reshape(bottom, top);
   switch (Caffe::mode()) {
   case Caffe::CPU:
     Forward_cpu(bottom, top);

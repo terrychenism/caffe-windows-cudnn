@@ -1,12 +1,12 @@
 #include <glog/logging.h>
 #include <cstdio>
 #include <ctime>
-#include <process.h>
-#include <direct.h>
 #include <boost/date_time.hpp>
 
 #include "caffe/common.hpp"
 #include "caffe/util/rng.hpp"
+
+#include <process.h>
 
 namespace caffe {
 
@@ -15,6 +15,7 @@ shared_ptr<Caffe> Caffe::singleton_;
 // random seeding
 int64_t cluster_seedgen(void) {
   int64_t s, seed, pid;
+#ifndef _MSC_VER
   FILE* f = fopen("/dev/urandom", "rb");
   if (f && fread(&seed, 1, sizeof(seed), f) == sizeof(seed)) {
     fclose(f);
@@ -25,12 +26,14 @@ int64_t cluster_seedgen(void) {
               "using fallback algorithm to generate seed instead.";
   if (f)
     fclose(f);
+#endif
 
   pid = _getpid();
   s = time(NULL);
   seed = abs(((s * 181) * ((pid - 83) * 359)) % 104729);
   return seed;
 }
+
 void initGlog()
 {
 	FLAGS_log_dir=".\\log\\";
@@ -60,7 +63,6 @@ void GlobalInit(int* pargc, char*** pargv) {
   // Provide a backtrace on segfault.
   //::google::InstallFailureSignalHandler();
   initGlog();
-
 }
 
 #ifdef CPU_ONLY  // CPU-only Caffe.

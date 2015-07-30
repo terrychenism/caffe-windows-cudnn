@@ -22,6 +22,7 @@
 // caffe.proto > LayerParameter > WindowDataParameter
 //   'source' field specifies the window_file
 //   'crop_size' indicates the desired warped size
+
 template <typename Dtype>
 Dtype round(Dtype r)
 {

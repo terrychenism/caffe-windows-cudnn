@@ -476,8 +476,8 @@ V1LayerParameter_LayerType UpgradeV0LayerType(const string& type) {
     return V1LayerParameter_LayerType_CONCAT;
   } else if (type == "conv") {
     return V1LayerParameter_LayerType_CONVOLUTION;
-  } else if (type == "crop") {
-    return V1LayerParameter_LayerType_CROP;
+  } else if (type == "compact_data") {
+	return V1LayerParameter_LayerType_COMPACT_DATA;
   } else if (type == "data") {
     return V1LayerParameter_LayerType_DATA;
   } else if (type == "dropout") {
@@ -518,6 +518,8 @@ V1LayerParameter_LayerType UpgradeV0LayerType(const string& type) {
     return V1LayerParameter_LayerType_TANH;
   } else if (type == "window_data") {
     return V1LayerParameter_LayerType_WINDOW_DATA;
+  } else if (type == "triplet_loss") {
+    return V1LayerParameter_LayerType_TRIPLET_LOSS;
   } else {
     LOG(FATAL) << "Unknown layer name: " << type;
     return V1LayerParameter_LayerType_NONE;
@@ -547,6 +549,13 @@ bool NetNeedsDataUpgrade(const NetParameter& net_param) {
       if (layer_param.has_crop_size()) { return true; }
       if (layer_param.has_mirror()) { return true; }
     }
+	if (net_param.layers(i).type() == V1LayerParameter_LayerType_COMPACT_DATA) {
+		WindowDataParameter layer_param = net_param.layers(i).window_data_param();
+		if (layer_param.has_scale()) { return true; }
+		if (layer_param.has_mean_file()) { return true; }
+		if (layer_param.has_crop_size()) { return true; }
+		if (layer_param.has_mirror()) { return true; }
+	}
   }
   return false;
 }
@@ -855,8 +864,8 @@ const char* UpgradeV1LayerType(const V1LayerParameter_LayerType type) {
     return "ContrastiveLoss";
   case V1LayerParameter_LayerType_CONVOLUTION:
     return "Convolution";
-  case V1LayerParameter_LayerType_CROP:
-    return "Crop";
+  case V1LayerParameter_LayerType_COMPACT_DATA:
+	return "CompactData";
   case V1LayerParameter_LayerType_DECONVOLUTION:
     return "Deconvolution";
   case V1LayerParameter_LayerType_DATA:
@@ -921,6 +930,14 @@ const char* UpgradeV1LayerType(const V1LayerParameter_LayerType type) {
     return "WindowData";
   case V1LayerParameter_LayerType_THRESHOLD:
     return "Threshold";
+  case V1LayerParameter_LayerType_BN:
+	return "BN";
+  case V1LayerParameter_LayerType_LOCAL:
+    return "Local";
+  case V1LayerParameter_LayerType_NORMALIZE:
+    return "Normalize";
+  case V1LayerParameter_LayerType_INSANITY:
+	return "Insanity";
   default:
     LOG(FATAL) << "Unknown V1LayerParameter layer type: " << type;
     return "";
