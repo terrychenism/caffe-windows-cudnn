@@ -834,6 +834,10 @@ bool UpgradeV1LayerParameter(const V1LayerParameter& v1_layer_param,
     layer_param->mutable_loss_param()->CopyFrom(
         v1_layer_param.loss_param());
   }
+  if (v1_layer_param.has_parse_evaluate_param()) {
+    layer_param->mutable_parse_evaluate_param()->CopyFrom(
+        v1_layer_param.parse_evaluate_param());
+  }
   if (v1_layer_param.has_layer()) {
     LOG(ERROR) << "Input NetParameter has V0 layer -- ignoring.";
     is_fully_compatible = false;
