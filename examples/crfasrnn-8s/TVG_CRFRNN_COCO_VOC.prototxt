@@ -215,3 +215,27 @@ layers {
     normalize: false
   }
 }
+
+layers {
+  type: PARSE_OUTPUT
+  name: "predlabel"
+  bottom: "pred"
+  top: "predlabel"
+  include {
+    phase: TEST
+  }
+}
+layers {
+  type: PARSE_EVALUATE
+  name: "evaluation"
+  bottom: "predlabel"
+  bottom: "label"
+  top: "evaluation"
+  parse_evaluate_param {
+    num_labels: 60
+    ignore_label: 255
+  }
+  include {
+    phase: TEST
+  }
+}
