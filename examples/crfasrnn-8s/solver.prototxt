@@ -1,4 +1,4 @@
-net: "TVG_CRFRNN_COCO_VOC.prototxt"
+net: "FCN_RNN.prototxt"
 test_iter: 100
 # make test net, but don't invoke it from the solver itself
 test_interval: 2000
