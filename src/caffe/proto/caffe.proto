@@ -1080,6 +1080,7 @@ message V1LayerParameter {
     LRN = 15;
     MEMORY_DATA = 29;
     MULTINOMIAL_LOGISTIC_LOSS = 16;
+    MULTI_STAGE_MEANFIELD = 43;
     MVN = 34;
     PARSE_OUTPUT = 41;
     PARSE_EVALUATE = 42;
@@ -1126,6 +1127,7 @@ message V1LayerParameter {
   optional InnerProductParameter inner_product_param = 17;
   optional LRNParameter lrn_param = 18;
   optional MemoryDataParameter memory_data_param = 22;
+  optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 43;
   optional MVNParameter mvn_param = 34;
   optional PoolingParameter pooling_param = 19;
   optional PowerParameter power_param = 21;
@@ -1231,6 +1233,24 @@ message V0LayerParameter {
   // the other dimensions must be the same for all the bottom blobs.
   // By default it will concatenate blobs along the channels dimension.
   optional uint32 concat_dim = 65 [default = 1];
+
+  // For MultiStageMeanfieldLayer
+  enum Mode {
+    POTTS = 0;
+  }
+  optional Mode compatibility_mode = 66 [default = POTTS];
+  optional float threshold = 67;
+  
+  required float theta_alpha = 68 [default = 10.];
+  required float theta_beta = 69 [default = 10.];
+  required float theta_gamma = 70 [default = 10.];
+  
+  required uint32 num_iterations = 71 [default = 1];
+  optional float spatial_filter_weight = 72 [default = 1];
+  optional float bilateral_filter_weight = 73 [default = 1];
+  
+  optional float forced_spatial_filter_weight = 74;
+  optional float forced_bilateral_filter_weight = 75;
 
   optional HDF5OutputParameter hdf5_output_param = 1001;
 }

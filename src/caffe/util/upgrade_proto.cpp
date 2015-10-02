@@ -782,6 +782,10 @@ bool UpgradeV1LayerParameter(const V1LayerParameter& v1_layer_param,
     layer_param->mutable_memory_data_param()->CopyFrom(
         v1_layer_param.memory_data_param());
   }
+  if (v1_layer_param.has_multi_stage_meanfield_param()) {
+    layer_param->mutable_multi_stage_meanfield_param()->CopyFrom(
+        v1_layer_param.multi_stage_meanfield_param());
+  }
   if (v1_layer_param.has_mvn_param()) {
     layer_param->mutable_mvn_param()->CopyFrom(
         v1_layer_param.mvn_param());
@@ -893,6 +897,8 @@ const char* UpgradeV1LayerType(const V1LayerParameter_LayerType type) {
     return "MemoryData";
   case V1LayerParameter_LayerType_MULTINOMIAL_LOGISTIC_LOSS:
     return "MultinomialLogisticLoss";
+  case V1LayerParameter_LayerType_MULTI_STAGE_MEANFIELD:
+    return "MultiStageMeanfield";
   case V1LayerParameter_LayerType_MVN:
     return "MVN";
   case V1LayerParameter_LayerType_PARSE_OUTPUT:
