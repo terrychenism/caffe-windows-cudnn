@@ -1127,10 +1127,11 @@ message V1LayerParameter {
   optional InnerProductParameter inner_product_param = 17;
   optional LRNParameter lrn_param = 18;
   optional MemoryDataParameter memory_data_param = 22;
-  optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 43;
+  optional MultiStageMeanfieldParameter multi_stage_meanfield_param = 44;
   optional MVNParameter mvn_param = 34;
   optional PoolingParameter pooling_param = 19;
   optional PowerParameter power_param = 21;
+  optional ParseEvaluateParameter parse_evaluate_param = 43; 
   optional ReLUParameter relu_param = 30;
   optional SigmoidParameter sigmoid_param = 38;
   optional SoftmaxParameter softmax_param = 39;
@@ -1251,6 +1252,11 @@ message V0LayerParameter {
   
   optional float forced_spatial_filter_weight = 74;
   optional float forced_bilateral_filter_weight = 75;
+
+    // Number of total labels. Must provide.
+  optional int32 num_labels = 76;
+  // Ignore evaluating following labels.
+  repeated int32 ignore_label = 77;
 
   optional HDF5OutputParameter hdf5_output_param = 1001;
 }
