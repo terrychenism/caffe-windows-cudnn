@@ -1,8 +1,8 @@
 name: 'FCN_RNN'
 
-layers {
+layer {
   name: "data"
-  type: DATA
+  type: "Data"
   top: "data"
   include {
     phase: TRAIN
@@ -18,9 +18,9 @@ layers {
     backend: LMDB
   }
 }
-layers {
+layer {
   name: "label"
-  type: DATA
+  type: "Data"
   top: "label"
   include {
     phase: TRAIN
@@ -31,9 +31,9 @@ layers {
     backend: LMDB
   }
 }
-layers {
+layer {
   name: "data"
-  type: DATA
+  type: "Data"
   top: "data"
   include {
     phase: TEST
@@ -49,9 +49,9 @@ layers {
     backend: LMDB
   }
 }
-layers {
+layer {
   name: "label"
-  type: DATA
+  type: "Data"
   top: "label"
   include {
     phase: TEST
