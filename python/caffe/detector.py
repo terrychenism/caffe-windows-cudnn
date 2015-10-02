@@ -82,7 +82,9 @@ class Detector(caffe.Net):
         for ix, window_in in enumerate(window_inputs):
             caffe_in[ix] = self.transformer.preprocess(in_, window_in)
         out = self.forward_all(**{in_: caffe_in})
-        predictions = out[self.outputs[0]].squeeze(axis=(2,3))
+        # predictions = out[self.outputs[0]].squeeze(axis=(2,3))
+        # https://github.com/BVLC/caffe/issues/2268
+        predictions = out[self.outputs[0]].squeeze()
 
         # Package predictions with images and windows.
         detections = []

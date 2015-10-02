@@ -11,7 +11,7 @@ namespace caffe {
 /**
  * @brief An interface for classes that perform optimization on Net%s.
  *
- * Requires implementation of ApplyUpdate to compute a parameter update
+ * Requires implementation of ComputeUpdateValue to compute a parameter update
  * given the current state of the Net parameters.
  */
 template <typename Dtype>
@@ -39,8 +39,8 @@ class Solver {
   int iter() { return iter_; }
 
  protected:
-  // Make and apply the update value for the current iteration.
-  virtual void ApplyUpdate() = 0;
+  // Get the update value for the current iteration.
+  virtual void ComputeUpdateValue() = 0;
   // The Solver::Snapshot function implements the basic snapshotting utility
   // that stores the learned net. You should implement the SnapshotSolverState()
   // function that produces a SolverState protocol buffer that needs to be
@@ -49,6 +49,7 @@ class Solver {
   // The test routine
   void TestAll();
   void Test(const int test_net_id = 0);
+  void TestSegmentation(const int test_net_id = 0);
   virtual void SnapshotSolverState(SolverState* state) = 0;
   virtual void RestoreSolverState(const SolverState& state) = 0;
   void DisplayOutputBlobs(const int net_id);
@@ -80,13 +81,17 @@ class SGDSolver : public Solver<Dtype> {
  protected:
   void PreSolve();
   Dtype GetLearningRate();
-  virtual void ApplyUpdate();
-  virtual void Normalize(int param_id);
-  virtual void Regularize(int param_id);
-  virtual void ComputeUpdateValue(int param_id, Dtype rate);
+  void DisplayIterInfo(Dtype rate);
+  Dtype GetGradNorm();
+  void TrackAvgGradNorm();
+  Dtype ResetAvgGradNorm();
+  Dtype grad_norm;
+  int n_grad_norm_iters;
+  virtual void ComputeUpdateValue();
   virtual void ClipGradients();
   virtual void SnapshotSolverState(SolverState * state);
   virtual void RestoreSolverState(const SolverState& state);
+
   // history maintains the historical momentum data.
   // update maintains update related data and is not needed in snapshots.
   // temp maintains other information that might be needed in computation
@@ -105,7 +110,7 @@ class NesterovSolver : public SGDSolver<Dtype> {
       : SGDSolver<Dtype>(param_file) {}
 
  protected:
-  virtual void ComputeUpdateValue(int param_id, Dtype rate);
+  virtual void ComputeUpdateValue();
 
   DISABLE_COPY_AND_ASSIGN(NesterovSolver);
 };
@@ -119,7 +124,7 @@ class AdaGradSolver : public SGDSolver<Dtype> {
       : SGDSolver<Dtype>(param_file) { constructor_sanity_check(); }
 
  protected:
-  virtual void ComputeUpdateValue(int param_id, Dtype rate);
+  virtual void ComputeUpdateValue();
   void constructor_sanity_check() {
     CHECK_EQ(0, this->param_.momentum())
         << "Momentum cannot be used with AdaGrad.";

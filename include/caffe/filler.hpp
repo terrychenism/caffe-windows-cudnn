@@ -126,18 +126,17 @@ class PositiveUnitballFiller : public Filler<Dtype> {
 };
 
 /**
- * @brief Fills a Blob with values @f$ x \sim U(-a, +a) @f$ where @f$ a @f$ is
- *        set inversely proportional to number of incoming nodes, outgoing
- *        nodes, or their average.
+ * @brief Fills a Blob with values @f$ x \sim U(-a, +a) @f$ where @f$ a @f$
+ *        is set inversely proportional to the number of incoming nodes.
  *
  * A Filler based on the paper [Bengio and Glorot 2010]: Understanding
- * the difficulty of training deep feedforward neuralnetworks.
+ * the difficulty of training deep feedforward neuralnetworks, but does not
+ * use the fan_out value.
  *
- * It fills the incoming matrix by randomly sampling uniform data from [-scale,
- * scale] where scale = sqrt(3 / n) where n is the fan_in, fan_out, or their
- * average, depending on the variance_norm option. You should make sure the
- * input blob has shape (num, a, b, c) where a * b * c = fan_in and num * b * c
- * = fan_out. Note that this is currently not the case for inner product layers.
+ * It fills the incoming matrix by randomly sampling uniform data from
+ * [-scale, scale] where scale = sqrt(3 / fan_in) where fan_in is the number
+ * of input nodes. You should make sure the input blob has shape (num, a, b, c)
+ * where a * b * c = fan_in.
  *
  * TODO(dox): make notation in above comment consistent with rest & use LaTeX.
  */
@@ -149,16 +148,7 @@ class XavierFiller : public Filler<Dtype> {
   virtual void Fill(Blob<Dtype>* blob) {
     CHECK(blob->count());
     int fan_in = blob->count() / blob->num();
-    int fan_out = blob->count() / blob->channels();
-    Dtype n = fan_in;  // default to fan_in
-    if (this->filler_param_.variance_norm() ==
-        FillerParameter_VarianceNorm_AVERAGE) {
-      n = (fan_in + fan_out) / Dtype(2);
-    } else if (this->filler_param_.variance_norm() ==
-        FillerParameter_VarianceNorm_FAN_OUT) {
-      n = fan_out;
-    }
-    Dtype scale = sqrt(Dtype(3) / n);
+    Dtype scale = sqrt(Dtype(3) / fan_in);
     caffe_rng_uniform<Dtype>(blob->count(), -scale, scale,
         blob->mutable_cpu_data());
     CHECK_EQ(this->filler_param_.sparse(), -1)
@@ -166,44 +156,49 @@ class XavierFiller : public Filler<Dtype> {
   }
 };
 
-/**
- * @brief Fills a Blob with values @f$ x \sim N(0, \sigma^2) @f$ where
- *        @f$ \sigma^2 @f$ is set inversely proportional to number of incoming
- *        nodes, outgoing nodes, or their average.
- *
- * A Filler based on the paper [He, Zhang, Ren and Sun 2015]: Specifically
- * accounts for ReLU nonlinearities.
- *
- * Aside: for another perspective on the scaling factor, see the derivation of
- * [Saxe, McClelland, and Ganguli 2013 (v3)].
- *
- * It fills the incoming matrix by randomly sampling Gaussian data with std =
- * sqrt(2 / n) where n is the fan_in, fan_out, or their average, depending on
- * the variance_norm option. You should make sure the input blob has shape (num,
- * a, b, c) where a * b * c = fan_in and num * b * c = fan_out. Note that this
- * is currently not the case for inner product layers.
+
+/*!
+@brief Fills a Blob with coefficients of bilinear interpolation for upsampling.
+
+This is intended to be used in DeconvolutionLayer acting as UpsamplingLayer.
+You can upsample a feature map by any integer factor using the following proto.
+\code
+layer {
+  name: "upsample", type: "Deconvolution"
+  bottom: "{{bottom_name}}" top: "{{top_name}}"
+  convolution_param {
+    kernel_size: {{2 * factor - factor % 2}} stride: {{factor}}
+    num_output: {{channels_in}} group: {{channels_in}}
+    pad: {{ceil((factor - 1) / 2.)}}
+    weight_filler: { type: "bilinear_upsampling" } bias_term: false
+  }
+  param { lr_mult: 0 decay_mult: 0 }
+}
+\endcode
+Replace {{}} with your values. Note that the learning rate and the weight decay
+are set to 0 in order to keep coefficient values of bilinear interpolation
+unchanged during training. If you apply this to an image, this operation is
+equivalent to the following call in Python with Scikit.Image.
+\code{.py}
+out = skimage.transform.rescale(img, factor, mode='constant', cval=0)
+\endcode
  */
 template <typename Dtype>
-class MSRAFiller : public Filler<Dtype> {
+class BilinearUpsamplingFiller : public Filler<Dtype> {
  public:
-  explicit MSRAFiller(const FillerParameter& param)
+  explicit BilinearUpsamplingFiller(const FillerParameter& param)
       : Filler<Dtype>(param) {}
   virtual void Fill(Blob<Dtype>* blob) {
-    CHECK(blob->count());
-    int fan_in = blob->count() / blob->num();
-    int fan_out = blob->count() / blob->channels();
-    Dtype n = fan_in;  // default to fan_in
-    if (this->filler_param_.variance_norm() ==
-        FillerParameter_VarianceNorm_AVERAGE) {
-      n = (fan_in + fan_out) / Dtype(2);
-    } else if (this->filler_param_.variance_norm() ==
-        FillerParameter_VarianceNorm_FAN_OUT) {
-      n = fan_out;
+    CHECK_EQ(blob->num_axes(), 4) << "Blob must be 4 dim.";
+    CHECK_EQ(blob->width(), blob->height()) << "Filter must be square";
+    Dtype* data = blob->mutable_cpu_data();
+    int f = ceil(blob->width() / 2.);
+    float c = (2 * f - 1 - f % 2) / (2. * f);
+    for (int i = 0; i < blob->count(); ++i) {
+      float x = i % blob->width();
+      float y = (i / blob->width()) % blob->height();
+      data[i] = (1 - fabs(x / f - c)) * (1 - fabs(y / f - c));
     }
-	Dtype alpha = this->filler_param_.alpha();
-    Dtype std = sqrt(Dtype(2) / n / (1 + alpha * alpha));
-    caffe_rng_gaussian<Dtype>(blob->count(), Dtype(0), std,
-        blob->mutable_cpu_data());
     CHECK_EQ(this->filler_param_.sparse(), -1)
          << "Sparsity not supported by this Filler.";
   }
@@ -228,8 +223,8 @@ Filler<Dtype>* GetFiller(const FillerParameter& param) {
     return new UniformFiller<Dtype>(param);
   } else if (type == "xavier") {
     return new XavierFiller<Dtype>(param);
-  } else if (type == "msra") {
-    return new MSRAFiller<Dtype>(param);
+  } else if (type == "bilinear_upsampling") {
+    return new BilinearUpsamplingFiller<Dtype>(param);
   } else {
     CHECK(false) << "Unknown filler name: " << param.type();
   }

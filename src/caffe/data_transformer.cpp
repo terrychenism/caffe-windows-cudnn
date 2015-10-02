@@ -1,404 +1,41 @@
 #include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/uniform_real.hpp>
+#include <boost/random/variate_generator.hpp>
+
+#include <algorithm>
+#include <numeric>
 #include <string>
 #include <vector>
 
 #include "caffe/data_transformer.hpp"
+#include "caffe/util/im_transforms.hpp"
 #include "caffe/util/io.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/util/rng.hpp"
-#include "caffe/data_layers.hpp"
-
-#include <opencv2/core/core_c.h>
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/highgui/highgui_c.h>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/imgproc/imgproc_c.h>
 
 
-#include "caffe/util/opencv_util.hpp"
 
+boost::mt19937 gen;
+const double prob_eps = 0.01;
+
+int roll_weighted_die(const std::vector<double> probabilities) {
+  std::vector<double> cumulative;
+  std::partial_sum(&probabilities[0], &probabilities[0] + probabilities.size(),
+      std::back_inserter(cumulative));
+  boost::uniform_real<> dist(0, cumulative.back());
+  boost::variate_generator<boost::mt19937&,
+      boost::uniform_real<> > die(gen, dist);
+
+  // Find the position within the sequence and add 1
+  return (std::lower_bound(cumulative.begin(), cumulative.end(), die())
+      - cumulative.begin());
+}
 
 namespace caffe {
-
-template<typename Dtype>
-void DataTransformer<Dtype>::TransformSingle(const int batch_item_id,
-                                       IplImage *img,
-                                       const Dtype* mean,
-                                       Dtype* transformed_data) {
-  const int crop_size = param_.crop_size();
-  const bool mirror = param_.mirror();
-  const Dtype scale = param_.scale();
-
-  int channels = img->nChannels;
-  int width = img->width;
-  int height = img->height;
-  unsigned char* data = (unsigned char *)img->imageData;
-  int step = img->widthStep / sizeof(char);
-  // crop 4 courners + center
-  int w[5], h[5];
-  FillInOffsets(w, h, width, height, crop_size);
-  int h_off, w_off;
-  // We only do random crop when we do training.
-  if (this->phase_ == TRAIN) {
-    int r = caffe_rng_rand() % 5;
-    h_off = h[r];
-    w_off = w[r];
-  } else {
-    h_off = h[4];
-    w_off = w[4];
-  }
-
-
-  ////// -------------------!! for debug !! -------------------
-   //IplImage *dest = cvCreateImage(cvSize(crop_size * 2, crop_size * 2),
-   //                                  img->depth, img->nChannels);
-   //cvResize(img, dest);
-   //cvNamedWindow("Sample1");
-   //cvNamedWindow("Sample2");
-   //if (phase_ == TRAIN)
-   //  cvShowImage("Sample", dest);
-   //else
-   //  cvShowImage("Sample", img);
-   //cvWaitKey(0);
-   //cvReleaseImage(&img);
-   //cvReleaseImage(&dest);
-   //if (phase_ == TRAIN) {
-   //  cvSetImageROI(img, cvRect(w_off, h_off, crop_size, crop_size));
-   //  // cvCopy(img, dest, NULL);
-   //  cvResize(img, dest);
-   //  cvResetImageROI(img);
-   //  cvShowImage("Sample1", img);
-   //  cvShowImage("Sample2", dest);
-   //  cvWaitKey(0);
-   //}
-   //cvReleaseImage(&dest);
-  ////// -------------------------------------------------------
-  if (mirror && caffe_rng_rand() % 2) {
-    // Copy mirrored version
-    for (int c = 0; c < channels; c++) {
-      for (int h = 0; h < crop_size; h++) {
-        for (int w = 0; w < crop_size; w++) {
-          int top_index = ((batch_item_id * channels + c) * crop_size + h)
-                          * crop_size + (crop_size - 1 - w);
-          int data_index = (h + h_off) * step + (w + w_off) * channels + c;
-          int mean_index = (c * crop_size + h) * crop_size + w;
-          Dtype datum_element = static_cast<Dtype>(data[data_index]);
-          transformed_data[top_index] = (datum_element - mean[mean_index]) * scale;
-        }
-      }
-    }
-  } else {
-    // Normal copy
-    for (int c = 0; c < channels; c++) {
-      for (int h = 0; h < crop_size; h++) {
-        for (int w = 0; w < crop_size; w++) {
-          int top_index = ((batch_item_id * channels + c) * crop_size + h)
-                          * crop_size + w;
-          int data_index = (h + h_off) * step + (w + w_off) * channels + c;
-          int mean_index = (c * crop_size + h) * crop_size + w;
-          Dtype datum_element = static_cast<Dtype>(data[data_index]);
-          transformed_data[top_index] = (datum_element - mean[mean_index]) * scale;
-        }
-      }
-    }
-  }
-}
-
-template<typename Dtype>
-void DataTransformer<Dtype>::TransformMultiple(const int batch_item_id,
-                                       IplImage *img,
-                                       const Dtype* mean,
-                                       Dtype* transformed_data) {
-  const int crop_size = param_.crop_size();
-  const bool mirror = param_.mirror();
-  const Dtype scale = param_.scale();
-  const bool debug_display = param_.debug_display();
-  const bool contrast_adjustment = param_.contrast_adjustment();
-  const bool smooth_filtering = param_.smooth_filtering();
-  const bool jpeg_compression = param_.jpeg_compression();
-
-  // param for scaling
-  const float min_scaling_factor = param_.min_scaling_factor();
-  const float max_scaling_factor = param_.max_scaling_factor();
-  // param for rotation
-  const float angle_interval = param_.angle_interval();
-  // param for shearing
-  const float max_shearing_ratio = param_.max_shearing_ratio();
-  // param for perspective warpping
-  const float max_perspective_ratio = param_.max_perspective_ratio();
-  // border fill value
-  const CvScalar warp_fillval = cvScalarAll(param_.warp_fillval());
-
-  // figure out dimension
-  int channels = img->nChannels;
-  int width = img->width;
-  int height = img->height;
-
-  if (debug_display && this->phase_ == TRAIN)
-	  cvShowImage("Source", img);
-
-  // Flipping and Reflection -----------------------------------------------------------------
-  int flipping_mode = (caffe_rng_rand()% 4) - 1; // -1, 0, 1, 2
-  bool apply_flipping = flipping_mode != 2;
-  if (apply_flipping) {
-	  cvFlip(img, NULL, flipping_mode);
-	  if (debug_display && this->phase_ == TRAIN)
-		  cvShowImage("Flipping and Reflection", img);
-  }
-
-  // Smooth Filtering -------------------------------------------------------------
-  int smooth_type = 0, smooth_param1 = 3;
-  int apply_smooth = caffe_rng_rand() % 2;
-  if ( smooth_filtering && apply_smooth ) {
-	smooth_type = caffe_rng_rand() % 4; // see opencv_util.hpp
-	smooth_param1 = 3 + 2*(caffe_rng_rand() % 1);
-	cvSmooth(img, img, smooth_type, smooth_param1);
-	if (debug_display && this->phase_ == TRAIN)
-      cvShowImage("Smooth Filtering", img);
-  }
-
-  // Contrast and Brightness Adjuestment ----------------------------------------
-  float alpha = 1, beta = 0;
-  int apply_contrast = caffe_rng_rand() % 2;
-  if ( contrast_adjustment && apply_contrast ) {
-    float min_alpha = 0.8, max_alpha = 1.2;
-	alpha = Uniform(min_alpha, max_alpha);
-    beta = (float)(caffe_rng_rand() % 6);
-	// flip sign
-	if ( caffe_rng_rand() % 2 ) beta = - beta;
-    cvConvertScale(img, img, alpha, beta);
-	if (debug_display && this->phase_ == TRAIN)
-      cvShowImage("Contrast Adjustment", img);
-  }
-
-  // JPEG Compression -------------------------------------------------------------
-  // DO NOT use the following code as there is some memory leak which I cann't figure out
-  int QF = 100;
-  int apply_JPEG = caffe_rng_rand() % 2;
-  if ( jpeg_compression && apply_JPEG ) {
-	// JPEG quality factor
-	QF = 95 + 1 * (caffe_rng_rand() % 6);
-	int compression_params[2] = {CV_IMWRITE_JPEG_QUALITY, QF};
-    CvMat *img_jpeg = cvEncodeImage(".jpg", img, compression_params);
-	img = cvDecodeImage(img_jpeg);
-	cvReleaseMat(&img_jpeg);
-	if (debug_display && this->phase_ == TRAIN)
-      cvShowImage("JPEG Compression", img);
-  }
-
-  // Histogram Equalization ------------------------------------------------
-  //if ( Rand() % 2 )
-  //	cvEqualizeHist(img, img);
-
-  // Cropping and Padding -----------------------------------------------------------------  
-  /* Since in the end, we will resize the image to a fixed size (i.e. crop_size), so scaling
-   * the image will not make any difference. Therefore, we use cropping and padding to
-   * simulate scaling effect.
-   * For scaling factor > 1, we random crop the original image to simulate scaling up
-   * For scaling factor < 1, we random pad the original image to simulate scaling down
-  */
-  // scaling factor for height and width respectively
-  float sf_w = Uniform(min_scaling_factor, max_scaling_factor);
-  float sf_h = Uniform(min_scaling_factor, max_scaling_factor);
-  // ROI height and width
-  int roi_width = (int)(width * (1. / sf_w));
-  int roi_height = (int)(height * (1. / sf_h));
-  // random number for w_off and h_oof in cropPadImage function
-  unsigned int rng_w = caffe_rng_rand(), rng_h = caffe_rng_rand();
-  IplImage *img_crop_pad = cropPadImage(img, roi_width, roi_height,
-	                                    rng_w, rng_h, warp_fillval);
-  if (debug_display && this->phase_ == TRAIN)
-      cvShowImage("Cropping and Padding", img_crop_pad);
-
-  // param config for shearing
-  float shearing_ratio_x = Uniform(-max_shearing_ratio, max_shearing_ratio);
-  float shearing_ratio_y = Uniform(-max_shearing_ratio, max_shearing_ratio);
-
-  // param config for rotation
-  float angle_raw = Uniform(0, 360);
-  float angle_quant = angle_interval * ceil(angle_raw / angle_interval + 0.5);
-
-  // param for perspective warpping
-  // for x of four points
-  float perspective_ratio_x[4];
-  perspective_ratio_x[0] = 0 + Uniform(-max_perspective_ratio, max_perspective_ratio); // top-left
-  perspective_ratio_x[1] = 1 + Uniform(-max_perspective_ratio, max_perspective_ratio); // top-right
-  perspective_ratio_x[2] = 0 + Uniform(-max_perspective_ratio, max_perspective_ratio); // bottom-left
-  perspective_ratio_x[3] = 1 + Uniform(-max_perspective_ratio, max_perspective_ratio); // bottom-right
-  // for y of four points
-  float perspective_ratio_y[4];
-  perspective_ratio_y[0] = 0 + Uniform(-max_perspective_ratio, max_perspective_ratio); // top-left
-  perspective_ratio_y[1] = 0 + Uniform(-max_perspective_ratio, max_perspective_ratio); // top-right
-  perspective_ratio_y[2] = 1 + Uniform(-max_perspective_ratio, max_perspective_ratio); // bottom-left 
-  perspective_ratio_y[3] = 1 + Uniform(-max_perspective_ratio, max_perspective_ratio); // bottom-right
-
-  // random interpolation kernel
-  int interpolation = caffe_rng_rand() % 5; // see opencv_util.hpp
-
-  // perform perspective warpping in one go
-  IplImage *dest = warpPerspectiveOneGo(img_crop_pad, crop_size, crop_size,
-	  shearing_ratio_x, shearing_ratio_y, angle_quant, perspective_ratio_x, perspective_ratio_y,
-	  interpolation, warp_fillval);
-  if (debug_display && this->phase_ == TRAIN)
-      cvShowImage("Warp Perspective in one go", dest);
-  
-
-  //--------------------!! for debug only !!-------------------
-  if (debug_display && this->phase_ == TRAIN) {
-	LOG(INFO) << "----------------------------------------";
-	LOG(INFO) << "src width: " << width << ", src height: " << height;
-	LOG(INFO) << "dest width: " << crop_size << ", dest height: " << crop_size;
-	if (apply_flipping) {
-		LOG(INFO) << "* parameter for flipping: ";
-		LOG(INFO) << "  flipping_mode: " << flipping_mode;
-	}
-	if ( smooth_filtering && apply_smooth ) {
-      LOG(INFO) << "* parameter for smooth filtering: ";
-	  LOG(INFO) << "  smooth type: " << smooth_type << ", smooth param1: " << smooth_param1;
-	}
-	if ( contrast_adjustment && apply_contrast ) {
-	  LOG(INFO) << "* parameter for contrast adjustment: ";
-	  LOG(INFO) << "  alpha: " << alpha << ", beta: " << beta;
-	}
-	if ( jpeg_compression && apply_JPEG ) {
-	  LOG(INFO) << "* parameter for JPEG compression: ";
-	  LOG(INFO) << "  QF: " << QF;
-	}
-	LOG(INFO) << "* parameter for cropping and padding: ";
-	LOG(INFO) << "  sf_w: " << sf_w << ", sf_h: " << sf_h;
-	LOG(INFO) << "  roi_width: " << roi_width << ", roi_height: " << roi_height;
-	LOG(INFO) << "* parameter for shearing: ";
-	LOG(INFO) << "  max_shearing_ratio: " << max_shearing_ratio;
-	LOG(INFO) << "  shearing_ratio_x: " << shearing_ratio_x << ", shearing_ratio_y: " << shearing_ratio_y;
-	LOG(INFO) << "* parameter for rotation: ";
-	LOG(INFO) << "  angle_interval: " << angle_interval;
-	LOG(INFO) << "  angle: " << angle_quant;
-	LOG(INFO) << "* parameter for perspective transform:";
-	LOG(INFO) << "  max_perspective_ratio: " << max_perspective_ratio;
-	LOG(INFO) << "  top-left:     [" << perspective_ratio_x[0] << "," << perspective_ratio_y[0] << "]";
-	LOG(INFO) << "  top-right:    [" << perspective_ratio_x[1] << "," << perspective_ratio_y[1] << "]";
-	LOG(INFO) << "  bottom-left:  [" << perspective_ratio_x[2] << "," << perspective_ratio_y[2] << "]";
-	LOG(INFO) << "  bottom-right: [" << perspective_ratio_x[3] << "," << perspective_ratio_y[3] << "]";
-	LOG(INFO) << "* parameter for in-one-go warpping : ";
-	LOG(INFO) << "  interpolation: " << interpolation;
-    cvWaitKey(0);
-  }
-
-  unsigned char* data = (unsigned char *)dest->imageData;
-  int step = dest->widthStep / sizeof(char);
-  // leave flipping to opencv
-
-    // Normal copy
-    for (int c = 0; c < channels; c++) {
-      for (int h = 0; h < crop_size; h++) {
-        for (int w = 0; w < crop_size; w++) {
-          int top_index = ((batch_item_id * channels + c) * crop_size + h)
-                          * crop_size + w;
-          int data_index = h * step + w * channels + c;
-          int mean_index = (c * crop_size + h) * crop_size + w;
-          Dtype datum_element = static_cast<Dtype>(data[data_index]);
-          transformed_data[top_index] = (datum_element - mean[mean_index]) * scale;
-        }
-      }
-    }
-
-  cvReleaseImage(&img_crop_pad);
-  cvReleaseImage(&dest);
-}
-
-template<typename Dtype>
-void DataTransformer<Dtype>::Transform(const int batch_item_id,
-                                       IplImage *img,
-                                       const Dtype* mean,
-                                       Dtype* transformed_data) {
-  if (!param_.multiscale())
-    TransformSingle(batch_item_id, img, mean, transformed_data);
-  else
-    TransformMultiple(batch_item_id, img, mean, transformed_data);
-}
-
-template<typename Dtype>
-void DataTransformer<Dtype>::Transform(const int batch_item_id,
-                                       const Datum& datum,
-                                       const Dtype* mean,
-                                       Dtype* transformed_data) {
-  const string& data = datum.data();
-  const int channels = datum.channels();
-  const int height = datum.height();
-  const int width = datum.width();
-  const int size = datum.channels() * datum.height() * datum.width();
-
-  const int crop_size = param_.crop_size();
-  const bool mirror = param_.mirror();
-  const Dtype scale = param_.scale();
-
-  if (mirror && crop_size == 0) {
-    LOG(FATAL) << "Current implementation requires mirror and crop_size to be "
-               << "set at the same time.";
-  }
-
-  if (crop_size) {
-    CHECK(data.size()) << "Image cropping only support uint8 data";
-    int h_off, w_off;
-    // We only do random crop when we do training.
-    if (this->phase_ == TRAIN) {
-      h_off = caffe_rng_rand() % (height - crop_size);
-      w_off = caffe_rng_rand() % (width - crop_size);
-    } else {
-      h_off = (height - crop_size) / 2;
-      w_off = (width - crop_size) / 2;
-    }
-    if (mirror && caffe_rng_rand() % 2) {
-      // Copy mirrored version
-      for (int c = 0; c < channels; ++c) {
-        for (int h = 0; h < crop_size; ++h) {
-          for (int w = 0; w < crop_size; ++w) {
-            int data_index = (c * height + h + h_off) * width + w + w_off;
-            int top_index = ((batch_item_id * channels + c) * crop_size + h)
-                * crop_size + (crop_size - 1 - w);
-            Dtype datum_element =
-                static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
-            transformed_data[top_index] =
-                (datum_element - mean[data_index]) * scale;
-          }
-        }
-      }
-    } else {
-      // Normal copy
-      for (int c = 0; c < channels; ++c) {
-        for (int h = 0; h < crop_size; ++h) {
-          for (int w = 0; w < crop_size; ++w) {
-            int top_index = ((batch_item_id * channels + c) * crop_size + h)
-                * crop_size + w;
-            int data_index = (c * height + h + h_off) * width + w + w_off;
-            Dtype datum_element =
-                static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
-            transformed_data[top_index] =
-                (datum_element - mean[data_index]) * scale;
-          }
-        }
-      }
-    }
-  } else {
-    // we will prefer to use data() first, and then try float_data()
-    if (data.size()) {
-      for (int j = 0; j < size; ++j) {
-        Dtype datum_element =
-            static_cast<Dtype>(static_cast<uint8_t>(data[j]));
-        transformed_data[j + batch_item_id * size] =
-            (datum_element - mean[j]) * scale;
-      }
-    } else {
-      for (int j = 0; j < size; ++j) {
-        transformed_data[j + batch_item_id * size] =
-            (datum.float_data(j) - mean[j]) * scale;
-      }
-    }
-  }
-}
-
 
 template<typename Dtype>
 DataTransformer<Dtype>::DataTransformer(const TransformationParameter& param,
@@ -515,31 +152,10 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(const Datum& datum,
                                        Blob<Dtype>* transformed_blob) {
-  // If datum is encoded, decoded and transform the cv::image.
-  if (datum.encoded()) {
-    CHECK(!param_.force_color() && !param_.force_gray())
-        << "cannot set both force_color and force_gray";
-    cv::Mat cv_img;
-    if (param_.force_color() || param_.force_gray()) {
-    // If force_color then decode in color otherwise decode in gray.
-      cv_img = DecodeDatumToCVMat(datum, param_.force_color());
-    } else {
-      cv_img = DecodeDatumToCVMatNative(datum);
-    }
-    // Transform the cv::image into blob.
-    return Transform(cv_img, transformed_blob);
-  } else {
-    if (param_.force_color() || param_.force_gray()) {
-      LOG(ERROR) << "force_color and force_gray only for encoded datum";
-    }
-  }
-
-  const int crop_size = param_.crop_size();
   const int datum_channels = datum.channels();
   const int datum_height = datum.height();
   const int datum_width = datum.width();
 
-  // Check dimensions.
   const int channels = transformed_blob->channels();
   const int height = transformed_blob->height();
   const int width = transformed_blob->width();
@@ -549,6 +165,8 @@ void DataTransformer<Dtype>::Transform(const Datum& datum,
   CHECK_LE(height, datum_height);
   CHECK_LE(width, datum_width);
   CHECK_GE(num, 1);
+
+  const int crop_size = param_.crop_size();
 
   if (crop_size) {
     CHECK_EQ(crop_size, height);
@@ -602,127 +220,177 @@ void DataTransformer<Dtype>::Transform(const vector<cv::Mat> & mat_vector,
   }
 }
 
-template<typename Dtype>
-void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
-                                       Blob<Dtype>* transformed_blob) {
-  const int crop_size = param_.crop_size();
-  const int img_channels = cv_img.channels();
-  const int img_height = cv_img.rows;
-  const int img_width = cv_img.cols;
+  template<typename Dtype>
+  void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
+      Blob<Dtype>* transformed_blob) {
+    const int img_channels = cv_img.channels();
+    int img_height = cv_img.rows;
+    int img_width = cv_img.cols;
 
-  // Check dimensions.
-  const int channels = transformed_blob->channels();
-  const int height = transformed_blob->height();
-  const int width = transformed_blob->width();
-  const int num = transformed_blob->num();
+    const int channels = transformed_blob->channels();
+    const int height = transformed_blob->height();
+    const int width = transformed_blob->width();
+    const int num = transformed_blob->num();
 
-  CHECK_EQ(channels, img_channels);
-  CHECK_LE(height, img_height);
-  CHECK_LE(width, img_width);
-  CHECK_GE(num, 1);
+    CHECK_EQ(channels, img_channels);
+    CHECK_GE(num, 1);
 
-  CHECK(cv_img.depth() == CV_8U) << "Image data type must be unsigned byte";
+    CHECK(cv_img.depth() == CV_8U) << "Image data type must be unsigned byte";
 
-  const Dtype scale = param_.scale();
-  const bool do_mirror = param_.mirror() && Rand(2);
-  const bool has_mean_file = param_.has_mean_file();
-  const bool has_mean_values = mean_values_.size() > 0;
+    const int crop_size = param_.crop_size();
+    const Dtype scale = param_.scale();
+    const bool do_mirror = param_.mirror() && Rand(2);
+    const bool do_vert_mirror = param_.vertical_mirror() && Rand(2);
+    const bool has_mean_file = param_.has_mean_file();
+    const bool has_mean_values = mean_values_.size() > 0;
+    const int rotation_count = (param_.random_90_deg_rot()) ? Rand(4) : 0;
+    cv::Mat cv_resized_image, cv_noised_image, cv_cropped_image;
 
-  CHECK_GT(img_channels, 0);
-  CHECK_GE(img_height, crop_size);
-  CHECK_GE(img_width, crop_size);
+    const int num_resize_policies = param_.resize_param_size();
+    const int num_noise_policies = param_.noise_param_size();
 
-  Dtype* mean = NULL;
-  if (has_mean_file) {
-    CHECK_EQ(img_channels, data_mean_.channels());
-    CHECK_EQ(img_height, data_mean_.height());
-    CHECK_EQ(img_width, data_mean_.width());
-    mean = data_mean_.mutable_cpu_data();
-  }
-  if (has_mean_values) {
-    CHECK(mean_values_.size() == 1 || mean_values_.size() == img_channels) <<
+    if (num_resize_policies > 0) {
+      std::vector<double> probabilities;
+      double prob_sum = 0;
+      for (int i = 0; i < num_resize_policies; i++) {
+        const double prob = param_.resize_param(i).prob();
+        CHECK_GE(prob, 0);
+        CHECK_LE(prob, 1);
+        prob_sum+=prob;
+        probabilities.push_back(prob);
+      }
+      CHECK_NEAR(prob_sum, 1.0, prob_eps);
+      int policy_num = roll_weighted_die(probabilities);
+      cv_resized_image = ApplyResize(cv_img, param_.resize_param(policy_num));
+    } else {
+      cv_resized_image = cv_img;
+    }
+
+    if (num_noise_policies > 0) {
+      std::vector<double> probabilities;
+      double prob_sum = 0;
+      for (unsigned int i = 0; i < num_noise_policies; i++) {
+        const double prob = param_.noise_param(i).prob();
+        CHECK_GE(prob, 0);
+        CHECK_LE(prob, 1);
+        prob_sum+=prob;
+        probabilities.push_back(prob);
+      }
+      CHECK_NEAR(prob_sum, 1.0, prob_eps);
+      int policy_num = roll_weighted_die(probabilities);
+      cv_noised_image = ApplyNoise(cv_resized_image,
+          param_.noise_param(policy_num));
+
+    } else {
+      cv_noised_image = cv_resized_image;
+    }
+
+    CHECK_GT(img_channels, 0);
+
+    Dtype* mean = NULL;
+    if (has_mean_file) {
+      CHECK_EQ(img_channels, data_mean_.channels());
+      mean = data_mean_.mutable_cpu_data();
+    }
+    if (has_mean_values) {
+      CHECK(mean_values_.size() == 1 ||
+          mean_values_.size() == img_channels) <<
      "Specify either 1 mean_value or as many as channels: " << img_channels;
-    if (img_channels > 1 && mean_values_.size() == 1) {
-      // Replicate the mean_value for simplicity
-      for (int c = 1; c < img_channels; ++c) {
-        mean_values_.push_back(mean_values_[0]);
+      if (img_channels > 1 && mean_values_.size() == 1) {
+        // Replicate the mean_value for simplicity
+        for (int c = 1; c < img_channels; ++c) {
+          mean_values_.push_back(mean_values_[0]);
+        }
       }
     }
-  }
 
-  int h_off = 0;
-  int w_off = 0;
-  cv::Mat cv_cropped_img = cv_img;
-  if (crop_size) {
-    CHECK_EQ(crop_size, height);
-    CHECK_EQ(crop_size, width);
-    // We only do random crop when we do training.
-    if (phase_ == TRAIN) {
-      h_off = Rand(img_height - crop_size + 1);
-      w_off = Rand(img_width - crop_size + 1);
+    CHECK_GE(cv_noised_image.rows, crop_size);
+    CHECK_GE(cv_noised_image.cols, crop_size);
+    img_height = cv_noised_image.rows;
+    img_width = cv_noised_image.cols;
+
+    int h_off = 0;
+    int w_off = 0;
+    if (crop_size) {
+      CHECK_EQ(crop_size, height);
+      CHECK_EQ(crop_size, width);
+      // We only do random crop when we do training.
+      if (phase_ == TRAIN) {
+        h_off = Rand(img_height - crop_size + 1);
+        w_off = Rand(img_width - crop_size + 1);
+      } else {
+        h_off = (img_height - crop_size) / 2;
+        w_off = (img_width - crop_size) / 2;
+      }
+      cv::Rect roi(w_off, h_off, crop_size, crop_size);
+      cv_cropped_image = cv_noised_image(roi);
     } else {
-      h_off = (img_height - crop_size) / 2;
-      w_off = (img_width - crop_size) / 2;
+      cv_cropped_image = cv_noised_image;
     }
-    cv::Rect roi(w_off, h_off, crop_size, crop_size);
-    cv_cropped_img = cv_img(roi);
-  } else {
-    CHECK_EQ(img_height, height);
-    CHECK_EQ(img_width, width);
-  }
 
-  CHECK(cv_cropped_img.data);
+    CHECK_EQ(cv_cropped_image.rows, height);
+    CHECK_EQ(cv_cropped_image.cols, width);
+    if (has_mean_file) {
+      CHECK_EQ(cv_cropped_image.rows, data_mean_.height());
+      CHECK_EQ(cv_cropped_image.cols, data_mean_.width());
+    }
+    CHECK(cv_cropped_image.data);
 
-  Dtype* transformed_data = transformed_blob->mutable_cpu_data();
-  int top_index;
-  for (int h = 0; h < height; ++h) {
-    const uchar* ptr = cv_cropped_img.ptr<uchar>(h);
-    int img_index = 0;
-    for (int w = 0; w < width; ++w) {
-      for (int c = 0; c < img_channels; ++c) {
+    Dtype* transformed_data = transformed_blob->mutable_cpu_data();
+    int top_index;
+    for (int h = 0; h < height; ++h) {
+      const uchar* ptr = cv_cropped_image.ptr<uchar>(h);
+      int img_index = 0;
+      int h_idx = h;
+      if (do_vert_mirror) {
+        h_idx = height - 1 - h;
+      }
+      for (int w = 0; w < width; ++w) {
+        int w_idx = w;
         if (do_mirror) {
-          top_index = (c * height + h) * width + (width - 1 - w);
-        } else {
-          top_index = (c * height + h) * width + w;
+          w_idx = (width - 1 - w);
         }
-        // int top_index = (c * height + h) * width + w;
-        Dtype pixel = static_cast<Dtype>(ptr[img_index++]);
-        if (has_mean_file) {
-          int mean_index = (c * img_height + h_off + h) * img_width + w_off + w;
-          transformed_data[top_index] =
-            (pixel - mean[mean_index]) * scale;
-        } else {
-          if (has_mean_values) {
+        int h_idx_real = h_idx;
+        int w_idx_real = w_idx;
+        if (rotation_count == 1) {
+          int temp = w_idx_real;
+          w_idx_real = height - 1 - h_idx_real;
+          h_idx_real = temp;
+        } else if (rotation_count == 2) {
+          w_idx_real = width - 1 - w_idx_real;
+          h_idx_real = height - 1 - h_idx_real;
+        } else if (rotation_count == 3) {
+          int temp = h_idx_real;
+          h_idx_real = width - 1 - w_idx_real;
+          w_idx_real = temp;
+        }
+        for (int c = 0; c < img_channels; ++c) {
+          top_index = (c * height + h_idx_real) * width + w_idx_real;
+          Dtype pixel = static_cast<Dtype>(ptr[img_index++]);
+          if (has_mean_file) {
+            int mean_index = (c * img_height + h_off + h_idx_real) * img_width
+                + w_off + w_idx_real;
             transformed_data[top_index] =
-              (pixel - mean_values_[c]) * scale;
+                (pixel - mean[mean_index]) * scale;
           } else {
-            transformed_data[top_index] = pixel * scale;
+            if (has_mean_values) {
+              transformed_data[top_index] =
+                  (pixel - mean_values_[c]) * scale;
+            } else {
+              transformed_data[top_index] = pixel * scale;
+            }
           }
         }
       }
     }
   }
-}
-
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(Blob<Dtype>* input_blob,
                                        Blob<Dtype>* transformed_blob) {
-  const int crop_size = param_.crop_size();
   const int input_num = input_blob->num();
   const int input_channels = input_blob->channels();
   const int input_height = input_blob->height();
   const int input_width = input_blob->width();
-
-  if (transformed_blob->count() == 0) {
-    // Initialize transformed_blob with the right shape.
-    if (crop_size) {
-      transformed_blob->Reshape(input_num, input_channels,
-                                crop_size, crop_size);
-    } else {
-      transformed_blob->Reshape(input_num, input_channels,
-                                input_height, input_width);
-    }
-  }
 
   const int num = transformed_blob->num();
   const int channels = transformed_blob->channels();
@@ -735,7 +403,7 @@ void DataTransformer<Dtype>::Transform(Blob<Dtype>* input_blob,
   CHECK_GE(input_height, height);
   CHECK_GE(input_width, width);
 
-
+  const int crop_size = param_.crop_size();
   const Dtype scale = param_.scale();
   const bool do_mirror = param_.mirror() && Rand(2);
   const bool has_mean_file = param_.has_mean_file();
@@ -817,82 +485,6 @@ void DataTransformer<Dtype>::Transform(Blob<Dtype>* input_blob,
   }
 }
 
-template<typename Dtype>
-vector<int> DataTransformer<Dtype>::InferBlobShape(const Datum& datum) {
-  if (datum.encoded()) {
-    CHECK(!param_.force_color() && !param_.force_gray())
-        << "cannot set both force_color and force_gray";
-    cv::Mat cv_img;
-    if (param_.force_color() || param_.force_gray()) {
-    // If force_color then decode in color otherwise decode in gray.
-      cv_img = DecodeDatumToCVMat(datum, param_.force_color());
-    } else {
-      cv_img = DecodeDatumToCVMatNative(datum);
-    }
-    // InferBlobShape using the cv::image.
-    return InferBlobShape(cv_img);
-  }
-
-  const int crop_size = param_.crop_size();
-  const int datum_channels = datum.channels();
-  const int datum_height = datum.height();
-  const int datum_width = datum.width();
-  // Check dimensions.
-  CHECK_GT(datum_channels, 0);
-  CHECK_GE(datum_height, crop_size);
-  CHECK_GE(datum_width, crop_size);
-  // Build BlobShape.
-  vector<int> shape(4);
-  shape[0] = 1;
-  shape[1] = datum_channels;
-  shape[2] = (crop_size)? crop_size: datum_height;
-  shape[3] = (crop_size)? crop_size: datum_width;
-  return shape;
-}
-
-template<typename Dtype>
-vector<int> DataTransformer<Dtype>::InferBlobShape(
-    const vector<Datum> & datum_vector) {
-  const int num = datum_vector.size();
-  CHECK_GT(num, 0) << "There is no datum to in the vector";
-  // Use first datum in the vector to InferBlobShape.
-  vector<int> shape = InferBlobShape(datum_vector[0]);
-  // Adjust num to the size of the vector.
-  shape[0] = num;
-  return shape;
-}
-
-template<typename Dtype>
-vector<int> DataTransformer<Dtype>::InferBlobShape(const cv::Mat& cv_img) {
-  const int crop_size = param_.crop_size();
-  const int img_channels = cv_img.channels();
-  const int img_height = cv_img.rows;
-  const int img_width = cv_img.cols;
-  // Check dimensions.
-  CHECK_GT(img_channels, 0);
-  CHECK_GE(img_height, crop_size);
-  CHECK_GE(img_width, crop_size);
-  // Build BlobShape.
-  vector<int> shape(4);
-  shape[0] = 1;
-  shape[1] = img_channels;
-  shape[2] = (crop_size)? crop_size: img_height;
-  shape[3] = (crop_size)? crop_size: img_width;
-  return shape;
-}
-
-template<typename Dtype>
-vector<int> DataTransformer<Dtype>::InferBlobShape(
-    const vector<cv::Mat> & mat_vector) {
-  const int num = mat_vector.size();
-  CHECK_GT(num, 0) << "There is no cv_img to in the vector";
-  // Use first cv_img in the vector to InferBlobShape.
-  vector<int> shape = InferBlobShape(mat_vector[0]);
-  // Adjust num to the size of the vector.
-  shape[0] = num;
-  return shape;
-}
-
 template <typename Dtype>
 void DataTransformer<Dtype>::InitRand() {
   const bool needs_rand = param_.mirror() ||
@@ -912,22 +504,6 @@ int DataTransformer<Dtype>::Rand(int n) {
   caffe::rng_t* rng =
       static_cast<caffe::rng_t*>(rng_->generator());
   return ((*rng)() % n);
-}
-
-//template <typename Dtype>
-//int DataTransformer<Dtype>::Rand() {
-//	CHECK(rng_);
-//	caffe::rng_t* rng =
-//		static_cast<caffe::rng_t*>(rng_->generator());
-//	return ((*rng)());
-//}
-
-template <typename Dtype>
-float DataTransformer<Dtype>::Uniform(const float min, const float max) {
-	CHECK(rng_);
-	Dtype d[1];
-	caffe_rng_uniform<Dtype>(1, Dtype(min), Dtype(max), d);
-	return (float)d[0];
 }
 
 INSTANTIATE_CLASS(DataTransformer);

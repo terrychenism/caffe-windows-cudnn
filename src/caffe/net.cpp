@@ -79,21 +79,15 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
     }
     // Setup layer.
     const LayerParameter& layer_param = param.layer(layer_id);
-	//LOG(INFO)<< layer_param.type();
     if (layer_param.propagate_down_size() > 0) {
       CHECK_EQ(layer_param.propagate_down_size(),
           layer_param.bottom_size())
-          << "propagate_down param must be specified "
-          << "either 0 or bottom_size times ";
+      << "propagate_down param must be specified"
+        << "either 0 or bottom_size times ";
     }
     layers_.push_back(LayerRegistry<Dtype>::CreateLayer(layer_param));
-
-	const string& type = layer_param.type();
-	LOG(INFO) << type;
-
-
+    layers_[layer_id]->set_net(this);
     layer_names_.push_back(layer_param.name());
-
     LOG(INFO) << "Creating Layer " << layer_param.name();
     bool need_backward = false;
 
@@ -113,7 +107,6 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
     // specified fewer than the required number (as specified by
     // ExactNumTopBlobs() or MinTopBlobs()), allocate them here.
     Layer<Dtype>* layer = layers_[layer_id].get();
-	//LOG(INFO) << layer->type();
     if (layer->AutoTopBlobs()) {
       const int needed_num_top =
           std::max(layer->MinTopBlobs(), layer->ExactNumTopBlobs());
@@ -254,18 +247,6 @@ void Net<Dtype>::Init(const NetParameter& in_param) {
   debug_info_ = param.debug_info();
   LOG(INFO) << "Network initialization done.";
   LOG(INFO) << "Memory required for data: " << memory_used_ * sizeof(Dtype);
-}
-
-template <typename Dtype>
-void Net<Dtype>::SetAllNeedBackward()
-{
-	for (int layer_id = layers_.size() - 1; layer_id >= 0; --layer_id) {
-		layer_need_backward_[layer_id] = true;
-		for (int bottom_id = 0; bottom_id < bottom_vecs_[layer_id].size();
-               ++bottom_id) {
-        bottom_need_backward_[layer_id][bottom_id] = true;
-        }
-	}
 }
 
 template <typename Dtype>
@@ -435,7 +416,7 @@ int Net<Dtype>::AppendBottom(const NetParameter& param, const int layer_id,
   // Check if the backpropagation on bottom_id should be skipped
   if (layer_param.propagate_down_size() > 0)
     propagate_down = layer_param.propagate_down(bottom_id);
-  const bool need_backward = blob_need_backward_[blob_id] &&
+  const bool need_backward = blob_need_backward_[blob_id] &
                           propagate_down;
   bottom_need_backward_[layer_id].push_back(need_backward);
   return blob_id;
@@ -465,7 +446,7 @@ void Net<Dtype>::AppendParam(const NetParameter& param, const int layer_id,
     // (i.e., not given a param_name) or explicitly given a name that we
     // haven't already seen.
     param_owners_.push_back(-1);
-    if (param_name.size()) {
+    if (param_size) {
       param_names_index_[param_name] = net_param_id;
     }
   } else {
@@ -810,15 +791,15 @@ void Net<Dtype>::Update() {
       owner_diff = params_[param_owners_[i]]->mutable_cpu_diff();
       caffe_add(count, this_diff, owner_diff, owner_diff);
       break;
-    case Caffe::GPU:
 #ifndef CPU_ONLY
+    case Caffe::GPU:
       this_diff = params_[i]->gpu_diff();
       owner_diff = params_[param_owners_[i]]->mutable_gpu_diff();
       caffe_gpu_add(count, this_diff, owner_diff, owner_diff);
+      break;
 #else
       NO_GPU;
 #endif
-      break;
     default:
       LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
     }

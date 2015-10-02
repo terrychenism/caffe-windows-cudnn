@@ -1,12 +1,9 @@
 #include <glog/logging.h>
 #include <cstdio>
 #include <ctime>
-#include <boost/date_time.hpp>
 
 #include "caffe/common.hpp"
 #include "caffe/util/rng.hpp"
-
-#include <process.h>
 
 namespace caffe {
 
@@ -15,7 +12,6 @@ shared_ptr<Caffe> Caffe::singleton_;
 // random seeding
 int64_t cluster_seedgen(void) {
   int64_t s, seed, pid;
-#ifndef _MSC_VER
   FILE* f = fopen("/dev/urandom", "rb");
   if (f && fread(&seed, 1, sizeof(seed), f) == sizeof(seed)) {
     fclose(f);
@@ -26,34 +22,13 @@ int64_t cluster_seedgen(void) {
               "using fallback algorithm to generate seed instead.";
   if (f)
     fclose(f);
-#endif
 
-  pid = _getpid();
+  pid = getpid();
   s = time(NULL);
   seed = abs(((s * 181) * ((pid - 83) * 359)) % 104729);
   return seed;
 }
 
-void initGlog()
-{
-	FLAGS_log_dir=".\\log\\";
-	_mkdir(FLAGS_log_dir.c_str());
-	std::string LOG_INFO_FILE;
-	std::string LOG_WARNING_FILE;
-	std::string LOG_ERROR_FILE;
-	std::string LOG_FATAL_FILE;
-	std::string now_time=boost::posix_time::to_iso_extended_string(boost::posix_time::second_clock::local_time());
-	now_time[13]='-';
-	now_time[16]='-';
-	LOG_INFO_FILE = FLAGS_log_dir + "INFO" + now_time + ".txt";
-	google::SetLogDestination(google::GLOG_INFO,LOG_INFO_FILE.c_str());
-	LOG_WARNING_FILE = FLAGS_log_dir + "WARNING" + now_time + ".txt";
-	google::SetLogDestination(google::GLOG_WARNING,LOG_WARNING_FILE.c_str());
-	LOG_ERROR_FILE = FLAGS_log_dir + "ERROR" + now_time + ".txt";
-	google::SetLogDestination(google::GLOG_ERROR,LOG_ERROR_FILE.c_str());
-	LOG_FATAL_FILE = FLAGS_log_dir + "FATAL" + now_time + ".txt";
-	google::SetLogDestination(google::GLOG_FATAL,LOG_FATAL_FILE.c_str());
-}
 
 void GlobalInit(int* pargc, char*** pargv) {
   // Google flags.
@@ -61,8 +36,7 @@ void GlobalInit(int* pargc, char*** pargv) {
   // Google logging.
   ::google::InitGoogleLogging(*(pargv)[0]);
   // Provide a backtrace on segfault.
-  //::google::InstallFailureSignalHandler();
-  initGlog();
+  ::google::InstallFailureSignalHandler();
 }
 
 #ifdef CPU_ONLY  // CPU-only Caffe.

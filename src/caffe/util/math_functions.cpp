@@ -7,9 +7,6 @@
 #include "caffe/util/math_functions.hpp"
 #include "caffe/util/rng.hpp"
 
-#define __builtin_popcount __popcnt   
-#define __builtin_popcountl __popcnt  
-
 namespace caffe {
 
 template<>
@@ -207,16 +204,6 @@ void caffe_exp<float>(const int n, const float* a, float* y) {
 template <>
 void caffe_exp<double>(const int n, const double* a, double* y) {
   vdExp(n, a, y);
-}
-
-template <>
-void caffe_log<float>(const int n, const float* a, float* y) {
-  vsLn(n, a, y);
-}
-
-template <>
-void caffe_log<double>(const int n, const double* a, double* y) {
-  vdLn(n, a, y);
 }
 
 template <>

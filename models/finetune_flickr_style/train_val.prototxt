@@ -1,57 +1,49 @@
 name: "FlickrStyleCaffeNet"
-layer {
+layers {
   name: "data"
-  type: "ImageData"
+  type: IMAGE_DATA
   top: "data"
   top: "label"
-  include {
-    phase: TRAIN
-  }
-  transform_param {
-    mirror: true
-    crop_size: 227
-    mean_file: "data/ilsvrc12/imagenet_mean.binaryproto"
-  }
   image_data_param {
     source: "data/flickr_style/train.txt"
     batch_size: 50
     new_height: 256
     new_width: 256
   }
-}
-layer {
-  name: "data"
-  type: "ImageData"
-  top: "data"
-  top: "label"
-  include {
-    phase: TEST
-  }
   transform_param {
-    mirror: false
     crop_size: 227
     mean_file: "data/ilsvrc12/imagenet_mean.binaryproto"
+    mirror: true
   }
+  include: { phase: TRAIN }
+}
+layers {
+  name: "data"
+  type: IMAGE_DATA
+  top: "data"
+  top: "label"
   image_data_param {
     source: "data/flickr_style/test.txt"
     batch_size: 50
     new_height: 256
     new_width: 256
   }
+  transform_param {
+    crop_size: 227
+    mean_file: "data/ilsvrc12/imagenet_mean.binaryproto"
+    mirror: false
+  }
+  include: { phase: TEST }
 }
-layer {
+layers {
   name: "conv1"
-  type: "Convolution"
+  type: CONVOLUTION
   bottom: "data"
   top: "conv1"
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
+  blobs_lr: 1
+  blobs_lr: 2
+  weight_decay: 1
+  weight_decay: 0
   convolution_param {
     num_output: 96
     kernel_size: 11
@@ -66,15 +58,15 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu1"
-  type: "ReLU"
+  type: RELU
   bottom: "conv1"
   top: "conv1"
 }
-layer {
+layers {
   name: "pool1"
-  type: "Pooling"
+  type: POOLING
   bottom: "conv1"
   top: "pool1"
   pooling_param {
@@ -83,9 +75,9 @@ layer {
     stride: 2
   }
 }
-layer {
+layers {
   name: "norm1"
-  type: "LRN"
+  type: LRN
   bottom: "pool1"
   top: "norm1"
   lrn_param {
@@ -94,19 +86,15 @@ layer {
     beta: 0.75
   }
 }
-layer {
+layers {
   name: "conv2"
-  type: "Convolution"
+  type: CONVOLUTION
   bottom: "norm1"
   top: "conv2"
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
+  blobs_lr: 1
+  blobs_lr: 2
+  weight_decay: 1
+  weight_decay: 0
   convolution_param {
     num_output: 256
     pad: 2
@@ -122,15 +110,15 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu2"
-  type: "ReLU"
+  type: RELU
   bottom: "conv2"
   top: "conv2"
 }
-layer {
+layers {
   name: "pool2"
-  type: "Pooling"
+  type: POOLING
   bottom: "conv2"
   top: "pool2"
   pooling_param {
@@ -139,9 +127,9 @@ layer {
     stride: 2
   }
 }
-layer {
+layers {
   name: "norm2"
-  type: "LRN"
+  type: LRN
   bottom: "pool2"
   top: "norm2"
   lrn_param {
@@ -150,19 +138,15 @@ layer {
     beta: 0.75
   }
 }
-layer {
+layers {
   name: "conv3"
-  type: "Convolution"
+  type: CONVOLUTION
   bottom: "norm2"
   top: "conv3"
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
+  blobs_lr: 1
+  blobs_lr: 2
+  weight_decay: 1
+  weight_decay: 0
   convolution_param {
     num_output: 384
     pad: 1
@@ -177,25 +161,21 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu3"
-  type: "ReLU"
+  type: RELU
   bottom: "conv3"
   top: "conv3"
 }
-layer {
+layers {
   name: "conv4"
-  type: "Convolution"
+  type: CONVOLUTION
   bottom: "conv3"
   top: "conv4"
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
+  blobs_lr: 1
+  blobs_lr: 2
+  weight_decay: 1
+  weight_decay: 0
   convolution_param {
     num_output: 384
     pad: 1
@@ -211,25 +191,21 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu4"
-  type: "ReLU"
+  type: RELU
   bottom: "conv4"
   top: "conv4"
 }
-layer {
+layers {
   name: "conv5"
-  type: "Convolution"
+  type: CONVOLUTION
   bottom: "conv4"
   top: "conv5"
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
+  blobs_lr: 1
+  blobs_lr: 2
+  weight_decay: 1
+  weight_decay: 0
   convolution_param {
     num_output: 256
     pad: 1
@@ -245,15 +221,15 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu5"
-  type: "ReLU"
+  type: RELU
   bottom: "conv5"
   top: "conv5"
 }
-layer {
+layers {
   name: "pool5"
-  type: "Pooling"
+  type: POOLING
   bottom: "conv5"
   top: "pool5"
   pooling_param {
@@ -262,19 +238,15 @@ layer {
     stride: 2
   }
 }
-layer {
+layers {
   name: "fc6"
-  type: "InnerProduct"
+  type: INNER_PRODUCT
   bottom: "pool5"
   top: "fc6"
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
+  blobs_lr: 1
+  blobs_lr: 2
+  weight_decay: 1
+  weight_decay: 0
   inner_product_param {
     num_output: 4096
     weight_filler {
@@ -287,35 +259,31 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu6"
-  type: "ReLU"
+  type: RELU
   bottom: "fc6"
   top: "fc6"
 }
-layer {
+layers {
   name: "drop6"
-  type: "Dropout"
+  type: DROPOUT
   bottom: "fc6"
   top: "fc6"
   dropout_param {
     dropout_ratio: 0.5
   }
 }
-layer {
+layers {
   name: "fc7"
-  type: "InnerProduct"
+  type: INNER_PRODUCT
   bottom: "fc6"
   top: "fc7"
-  # Note that lr_mult can be set to 0 to disable any fine-tuning of this, and any other, layer
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
+  # Note that blobs_lr can be set to 0 to disable any fine-tuning of this, and any other, layer
+  blobs_lr: 1
+  blobs_lr: 2
+  weight_decay: 1
+  weight_decay: 0
   inner_product_param {
     num_output: 4096
     weight_filler {
@@ -328,35 +296,31 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu7"
-  type: "ReLU"
+  type: RELU
   bottom: "fc7"
   top: "fc7"
 }
-layer {
+layers {
   name: "drop7"
-  type: "Dropout"
+  type: DROPOUT
   bottom: "fc7"
   top: "fc7"
   dropout_param {
     dropout_ratio: 0.5
   }
 }
-layer {
+layers {
   name: "fc8_flickr"
-  type: "InnerProduct"
+  type: INNER_PRODUCT
   bottom: "fc7"
   top: "fc8_flickr"
-  # lr_mult is set to higher than for other layers, because this layer is starting from random while the others are already trained
-  param {
-    lr_mult: 10
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 20
-    decay_mult: 0
-  }
+  # blobs_lr is set to higher than for other layers, because this layer is starting from random while the others are already trained
+  blobs_lr: 10
+  blobs_lr: 20
+  weight_decay: 1
+  weight_decay: 0
   inner_product_param {
     num_output: 20
     weight_filler {
@@ -369,19 +333,17 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "loss"
-  type: "SoftmaxWithLoss"
+  type: SOFTMAX_LOSS
   bottom: "fc8_flickr"
   bottom: "label"
 }
-layer {
+layers {
   name: "accuracy"
-  type: "Accuracy"
+  type: ACCURACY
   bottom: "fc8_flickr"
   bottom: "label"
   top: "accuracy"
-  include {
-    phase: TEST
-  }
+  include: { phase: TEST }
 }

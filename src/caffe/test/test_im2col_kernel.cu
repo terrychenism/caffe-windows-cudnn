@@ -19,13 +19,14 @@ __global__ void im2col_gpu_kernel(const int n, const Dtype* data_im,
     const int height, const int width, const int kernel_h, const int kernel_w,
     const int pad_h, const int pad_w,
     const int stride_h, const int stride_w,
+    const int filter_stride_h, const int filter_stride_w,
     const int height_col, const int width_col,
     Dtype* data_col);
 
 extern cudaDeviceProp CAFFE_TEST_CUDA_PROP;
 
 template <typename Dtype>
-class Im2colKernelTest : public GPUDeviceTest<Dtype> {
+class Im2colKernelTest : public ::testing::Test {
  protected:
   Im2colKernelTest()
         // big so launches > 1024 threads
@@ -41,9 +42,12 @@ class Im2colKernelTest : public GPUDeviceTest<Dtype> {
     channels_ = blob_bottom_->channels();
     pad_ = 0;
     stride_ = 2;
+    filter_stride_ = 2;
     kernel_size_ = 3;
-    height_col_ = (height_ + 2 * pad_ - kernel_size_) / stride_ + 1;
-    width_col_ = (width_ + 2 * pad_ - kernel_size_) / stride_ + 1;
+    const int kernel_size_eff = kernel_size_
+      + (kernel_size_ - 1) * (filter_stride_ - 1);
+    height_col_ = (height_ + 2 * pad_ - kernel_size_eff) / stride_ + 1;
+    width_col_ = (width_ + 2 * pad_ - kernel_size_eff) / stride_ + 1;
   }
 
   virtual ~Im2colKernelTest() {
@@ -60,6 +64,7 @@ class Im2colKernelTest : public GPUDeviceTest<Dtype> {
   int channels_;
   int pad_;
   int stride_;
+  int filter_stride_;
   int kernel_size_;
   int height_col_;
   int width_col_;
@@ -68,6 +73,8 @@ class Im2colKernelTest : public GPUDeviceTest<Dtype> {
 TYPED_TEST_CASE(Im2colKernelTest, TestDtypes);
 
 TYPED_TEST(Im2colKernelTest, TestGPU) {
+  Caffe::set_mode(Caffe::GPU);
+
   // Reshape the blobs to correct size for im2col output
   this->blob_top_->Reshape(this->blob_bottom_->num(),
           this->channels_ * this->kernel_size_ * this->kernel_size_,
@@ -88,7 +95,7 @@ TYPED_TEST(Im2colKernelTest, TestGPU) {
     im2col_cpu(this->blob_bottom_->cpu_data() + this->blob_bottom_->offset(n),
       this->channels_, this->height_, this->width_,
       this->kernel_size_, this->kernel_size_, this->pad_, this->pad_,
-      this->stride_, this->stride_,
+      this->stride_, this->stride_, this->filter_stride_, this->filter_stride_,
       cpu_data + this->blob_top_cpu_->offset(n));
   }
 
@@ -105,6 +112,7 @@ TYPED_TEST(Im2colKernelTest, TestGPU) {
         num_kernels, bottom_data + this->blob_bottom_->offset(n),
         this->height_, this->width_, this->kernel_size_, this->kernel_size_,
         this->pad_, this->pad_, this->stride_, this->stride_,
+        this->filter_stride_, this->filter_stride_,
         this->height_col_, this->width_col_,
         top_data + this->blob_top_->offset(n));
       CUDA_POST_KERNEL_CHECK;

@@ -71,75 +71,25 @@ class ArgMaxLayer : public Layer<Dtype> {
 };
 
 /**
-* @brief Batch Normalization per-channel with scale & shift linear transform.
-*
-*/
-template <typename Dtype>
-class BNLayer : public Layer<Dtype> {
-public:
-	explicit BNLayer(const LayerParameter& param)
-		: Layer<Dtype>(param) {}
-	virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
-		const vector<Blob<Dtype>*>& top);
-	virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
-
-	virtual inline const char* type() const { return "BN"; }
-	virtual inline int ExactNumBottomBlobs() const { return 1; }
-	virtual inline int ExactNumTopBlobs() const { return 1; }
-
-protected:
-	virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-		const vector<Blob<Dtype>*>& top);
-	virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-		const vector<Blob<Dtype>*>& top);
-	virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-		const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-	virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-		const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-
-	// spatial mean & variance
-	Blob<Dtype> spatial_statistic_;
-	// batch mean & variance
-	Blob<Dtype> batch_statistic_;
-	// buffer blob
-	Blob<Dtype> buffer_blob_;
-	// x_norm and x_std
-	Blob<Dtype> x_norm_, x_std_;
-	// Due to buffer_blob_ and x_norm, this implementation is memory-consuming
-	// May use for-loop instead
-
-	// x_sum_multiplier is used to carry out sum using BLAS
-	Blob<Dtype> spatial_sum_multiplier_, batch_sum_multiplier_;
-
-	// dimension
-	int num_;
-	int channels_;
-	int height_;
-	int width_;
-	// eps
-	Dtype var_eps_;
-	// decay factor
-	Dtype decay_;
-	// whether or not using moving average for inference
-	bool moving_average_;
-
-};
-
-/**
- * @brief Normalizes input.
+ * @brief Batch Normalization with scale & shift linear transform.
+ *
  */
 template <typename Dtype>
-class NormalizeLayer : public Layer<Dtype> {
+class BNLayer : public Layer<Dtype> {
  public:
-  explicit NormalizeLayer(const LayerParameter& param)
+  explicit BNLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline const char* type() const { return "Normalize"; }
+  virtual inline const char* type() const { return "BN"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -149,12 +99,37 @@ class NormalizeLayer : public Layer<Dtype> {
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  Blob<Dtype> sum_multiplier_, norm_, squared_;
+  // parameters
+  Dtype var_eps_;
+  // used in TRAIN phase
+  bool moving_average_;
+  Dtype decay_;
+  // if true, compute mean & variance for whole feature map;
+  // otherwise, compute mean & variance for each activation
+  bool across_spatial_;
+
+  // batch mean & variance
+  Blob<Dtype> batch_mean_, batch_std_;
+  Blob<Dtype> accum_mean_, accum_variance_;
+  // buffer blob & vector
+  Blob<Dtype> buffer_blob_;
+  Blob<Dtype> buffer_cube_;
+  Blob<Dtype> buffer_vec_;
+
+  // the normalized input
+  Blob<Dtype> x_norm_;
+  // used to carry out sum using BLAS
+  Blob<Dtype> batch_sum_multiplier_, spatial_sum_multiplier_;
+
+  // dimension
+  int N_, C_, H_, W_;
+  // batch height and width
+  int BH_, BW_;
 };
 
-/**
+  /**
  * @brief Takes at least two Blob%s and concatenates them along either the num
  *        or channel dimension, outputting the result.
  */
@@ -171,6 +146,9 @@ class ConcatLayer : public Layer<Dtype> {
   virtual inline const char* type() const { return "Concat"; }
   virtual inline int MinBottomBlobs() const { return 2; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   /**
@@ -246,6 +224,9 @@ class EltwiseLayer : public Layer<Dtype> {
   virtual inline const char* type() const { return "Eltwise"; }
   virtual inline int MinBottomBlobs() const { return 2; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -262,69 +243,6 @@ class EltwiseLayer : public Layer<Dtype> {
   Blob<int> max_idx_;
 
   bool stable_prod_grad_;
-};
-
-/**
- * @brief Takes two+ Blobs, interprets last Blob as a selector and
- *  filter remaining Blobs accordingly with selector data (0 means that
- * the corresponding item has to be filtered, non-zero means that corresponding
- * item needs to stay).
- */
-template <typename Dtype>
-class FilterLayer : public Layer<Dtype> {
- public:
-  explicit FilterLayer(const LayerParameter& param)
-      : Layer<Dtype>(param) {}
-  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
-  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
-
-  virtual inline const char* type() const { return "Filter"; }
-  virtual inline int MinBottomBlobs() const { return 2; }
-  virtual inline int MinTopBlobs() const { return 1; }
-
- protected:
-  /**
-   * @param bottom input Blob vector (length 2+)
-   *   -# @f$ (N \times C \times H \times W) @f$
-   *      the inputs to be filtered @f$ x_1 @f$
-   *   -# ...
-   *   -# @f$ (N \times C \times H \times W) @f$
-   *      the inputs to be filtered @f$ x_K @f$
-   *   -# @f$ (N \times 1 \times 1 \times 1) @f$
-   *      the selector blob
-   * @param top output Blob vector (length 1+)
-   *   -# @f$ (S \times C \times H \times W) @f$ ()
-   *        the filtered output @f$ x_1 @f$
-   *        where S is the number of items
-   *        that haven't been filtered
-   *      @f$ (S \times C \times H \times W) @f$
-   *        the filtered output @f$ x_K @f$
-   *        where S is the number of items
-   *        that haven't been filtered
-   */
-  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
-  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-    const vector<Blob<Dtype>*>& top);
-
-  /**
-   * @brief Computes the error gradient w.r.t. the forwarded inputs.
-   *
-   * @param top output Blob vector (length 1+), providing the error gradient with
-   *        respect to the outputs
-   * @param propagate_down see Layer::Backward.
-   * @param bottom input Blob vector (length 2+), into which the top error
-   *        gradient is copied
-   */
-  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-
-  bool first_reshape_;
-  vector<int> indices_to_forward_;
 };
 
 /**
@@ -427,6 +345,9 @@ class MVNLayer : public Layer<Dtype> {
   virtual inline const char* type() const { return "MVN"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -439,10 +360,9 @@ class MVNLayer : public Layer<Dtype> {
      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
   Blob<Dtype> mean_, variance_, temp_;
-
   /// sum_multiplier is used to carry out sum using BLAS
   Blob<Dtype> sum_multiplier_;
-  Dtype eps_;
+  Dtype eps;
 };
 
 /*
@@ -480,29 +400,29 @@ class ReshapeLayer : public Layer<Dtype> {
   /// @brief the index of the axis whose dimension we infer, or -1 if none
   int inferred_axis_;
   /// @brief the product of the "constant" output dimensions
-  int constant_count_;
+  int64_t constant_count_;
 };
 
 /**
- * @brief Compute "reductions" -- operations that return a scalar output Blob
- *        for an input Blob of arbitrary size, such as the sum, absolute sum,
- *        and sum of squares.
- *
- * TODO(dox): thorough documentation for Forward, Backward, and proto params.
+ * @brief Normalizes input.
+ * https://github.com/kuprel/caffe
  */
 template <typename Dtype>
-class ReductionLayer : public Layer<Dtype> {
+class NormalizeLayer : public Layer<Dtype> {
  public:
-  explicit ReductionLayer(const LayerParameter& param)
+  explicit NormalizeLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline const char* type() const { return "Reduction"; }
+  virtual inline const char* type() const { return "Normalize"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -512,20 +432,123 @@ class ReductionLayer : public Layer<Dtype> {
   virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+     const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-  /// @brief the reduction operation performed by the layer
-  ReductionParameter_ReductionOp op_;
-  /// @brief a scalar coefficient applied to all outputs
-  Dtype coeff_;
-  /// @brief the index of the first input axis to reduce
-  int axis_;
-  /// @brief the number of reductions performed
-  int num_;
-  /// @brief the input size of each reduction
-  int dim_;
-  /// @brief a helper Blob used for summation (op_ == SUM)
-  Blob<Dtype> sum_multiplier_;
+  Blob<Dtype> norm_;
+  Blob<Dtype> sum_channel_multiplier_, sum_spatial_multiplier_;
+  Blob<Dtype> buffer_, buffer_channel_, buffer_spatial_;
+  bool across_spatial_;
+  bool channel_shared_;
+  Dtype eps_;
+};
+
+/**
+ * @brief Count the prediction and ground truth statistics for each datum.
+ *
+ * NOTE: This does not implement Backwards operation.
+ */
+template <typename Dtype>
+class ParseEvaluateLayer : public Layer<Dtype> {
+ public:
+  /**
+   * @param param provides ParseEvaluateParameter parse_evaluate_param,
+   *     with ParseEvaluateLayer options:
+   *   - num_labels (\b optional int32.).
+   *     number of labels. must provide!!
+   *   - ignore_label (\b repeated int32).
+   *     If any, ignore evaluating the corresponding label for each
+   *     image.
+   */
+  explicit ParseEvaluateLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "ParseEvaluate"; }
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+ protected:
+  /**
+   * @param bottom input Blob vector (length 2)
+   *   -# @f$ (N \times 1 \times H \times W) @f$
+   *      the prediction label @f$ x @f$
+   *   -# @f$ (N \times 1 \times H \times W) @f$
+   *      the ground truth label @f$ x @f$
+   * @param top output Blob vector (length 1)
+   *   -# @f$ (N \times C \times 1 \times 3) @f$
+   *      the counts for different class @f$
+   */
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  /// @brief Not implemented (non-differentiable function)
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+    NOT_IMPLEMENTED;
+  }
+
+  // number of total labels
+  int num_labels_;
+  // store ignored labels
+  std::set<Dtype> ignore_labels_;
+};
+
+/**
+ * @brief Compute the segmentation label of the @f$ H \times W @f$ for each datum across
+ *        all channels @f$ C @f$.
+ *
+ * Intended for use after a classification layer to produce a prediction of
+ * segmentation label.
+ * If parameter out_max_val is set to true, also output the predicted value for
+ * the corresponding label for each image.
+ *
+ * NOTE: does not implement Backwards operation.
+ */
+template <typename Dtype>
+class ParseOutputLayer : public Layer<Dtype> {
+ public:
+  /**
+   * @param param provides ParseOutputParameter parse_output_param,
+   *     with ParseOutputLayer options:
+   *   - out_max_val (\b optional bool, default false).
+   *     if set, output the predicted value for the corresponding label for each
+   *     image.
+   */
+  explicit ParseOutputLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "ParseOutput"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int MaxTopBlobs() const { return 2; }
+
+ protected:
+  /**
+   * @param bottom input Blob vector (length 1)
+   *   -# @f$ (N \times C \times H \times W) @f$
+   *      the inputs @f$ x @f$
+   * @param top output Blob vector (length 1)
+   *   -# @f$ (N \times 1 \times H \times W) @f$ or, if out_max_val
+   *      @f$ (N \times 2 \times H \times W) @f$
+   *      the computed outputs @f$
+   */
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  /// @brief Not implemented (non-differentiable function)
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+    NOT_IMPLEMENTED;
+  }
+
+  bool out_max_val_;
+
+  // max_prob_ is used to store the maximum probability value
+  Blob<Dtype> max_prob_;
 };
 
 /**
@@ -573,6 +596,9 @@ class SoftmaxLayer : public Layer<Dtype> {
   virtual inline const char* type() const { return "Softmax"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -639,6 +665,9 @@ class SplitLayer : public Layer<Dtype> {
   virtual inline const char* type() const { return "Split"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int MinTopBlobs() const { return 1; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -651,41 +680,6 @@ class SplitLayer : public Layer<Dtype> {
       const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
   int count_;
-};
-
-/**
- * @brief Apply an affine transform on the input layer, where the affine parameters
- *        are learned by back-propagation.
- *        Max Jaderberg etc, Spatial Transformer Networks.
- *
- * TODO(dox): thorough documentation for Forward, Backward, and proto params.
- */
-template <typename Dtype>
-class TransformerLayer : public Layer<Dtype> {
- public:
-  explicit TransformerLayer(const LayerParameter& param)
-      : Layer<Dtype>(param) {}
-  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
-
-  virtual inline const char* type() const { return "Transformer"; }
-  virtual inline int ExactNumBottomBlobs() const { return 2; }
-  virtual inline int MinTopBlobs() const { return 1; }
-
- protected:
-  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);
-  /*virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top);*/
-  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-  /*virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
-      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);*/
-
-  int count_;
-  Blob<Dtype> CoordinateTarget;//3*(nwh)
-  Blob<Dtype> CoordinateSource;//2*(nwh)
-  Blob<Dtype> InterpolateWeight;//4*(nwh)
 };
 
 /**
@@ -707,6 +701,9 @@ class SliceLayer : public Layer<Dtype> {
   virtual inline const char* type() const { return "Slice"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int MinTopBlobs() const { return 2; }
+  virtual inline DiagonalAffineMap<Dtype> coord_map() {
+    return DiagonalAffineMap<Dtype>::identity(2);
+  }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -723,6 +720,35 @@ class SliceLayer : public Layer<Dtype> {
   int slice_size_;
   int slice_axis_;
   vector<int> slice_point_;
+};
+
+/**
+ * @brief Copy a Blob along specified dimensions.
+ */
+template <typename Dtype>
+class TileLayer : public Layer<Dtype> {
+ public:
+  explicit TileLayer(const LayerParameter& param)
+      : Layer<Dtype>(param) {}
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "Tile"; }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+ protected:
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  unsigned int axis_, tiles_, outer_dim_, inner_dim_;
 };
 
 }  // namespace caffe

@@ -7,6 +7,7 @@
 
 #include "boost/algorithm/string.hpp"
 #include "caffe/caffe.hpp"
+#include "caffe/syncedmem.hpp"
 
 using caffe::Blob;
 using caffe::Caffe;
@@ -30,6 +31,8 @@ DEFINE_string(weights, "",
     "Cannot be set simultaneously with snapshot.");
 DEFINE_int32(iterations, 50,
     "The number of iterations to run.");
+DEFINE_bool(debug_gpu_alloc, false,
+    "Show debugging information for GPU memory allocations.");
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -252,9 +255,6 @@ int time() {
     forward_timer.Start();
     for (int i = 0; i < layers.size(); ++i) {
       timer.Start();
-      // Although Reshape should be essentially free, we include it here
-      // so that we will notice Reshape performance bugs.
-      layers[i]->Reshape(bottom_vecs[i], top_vecs[i]);
       layers[i]->Forward(bottom_vecs[i], top_vecs[i]);
       forward_time_per_layer[i] += timer.MicroSeconds();
     }
@@ -307,6 +307,10 @@ int main(int argc, char** argv) {
   // Run tool or show usage.
   caffe::GlobalInit(&argc, &argv);
   if (argc == 2) {
+    // Handle tool-independent flags.
+    if (FLAGS_debug_gpu_alloc) {
+      caffe::SyncedMemory::set_debug_info(true);
+    }
     return GetBrewFunction(caffe::string(argv[1]))();
   } else {
     gflags::ShowUsageWithFlagsRestrict(argv[0], "tools/caffe");

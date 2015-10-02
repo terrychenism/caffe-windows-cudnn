@@ -1,50 +1,45 @@
-# Windows Installation
-This is not the original [Caffe Readme](https://github.com/BVLC/caffe/blob/master/README.md) but an installation guide for windows version.
+# ParseNet: Looking Wider to See Better
 
-#### Want to run first before build by yourself?
-You can download the windows x64 [standalone package](https://dl.dropboxusercontent.com/u/3466743/caffe-vs2012/standalone.7z) and run directly on MNIST dataset.
+By Wei Liu, Andrew Rabinovich, and Alex Berg.
 
-#### Prerequisites
-You may need the followings to build the code:
-- Windows 64-bit
-- MS Visual Studio 2012
-- CUDA toolkit 6.5
-- Other dependencies which you can directly download from [here](https://www.dropbox.com/s/121o1so5hj8zz64/3rdparty.rar?dl=0).
+### Introduction
 
-#### Build Steps
-Currently it can be built by VS2012 for x64 flatform only. This is because the dependencies mentioned above is cross-compiled to support x64 only. If you want to build on 32bit windows, you need to rebuild your own 3rd-party libraries.
-- Check out the code and switch to *windows* branch
-- Download the dependency file and extract the folders inside to project root directory.
-- Include any .cpp you want to build in the `./tools` directory to MainCaller.cpp.
-- Open the solution file in `./build/MSVC`
-- Switch build target to x64 platform (ONLY release mode is OK).
-- Build the code and you may find the `./bin/MainCaller.exe`
+ParseNet is a unified framework for semantic segmentation with CNN. You can use the package to train/evaluate a network for segmentation. For more details, please refer to our [arXiv paper](http://arxiv.org/abs/1506.04579).
 
-#### Train MNIST dataset
-- Suppose you choose to build train_net.cpp which is the default one in MainCaller.cpp
-- If you do not have GPU, please change it to CPU in `lenet_solver.prototxt`
-- Add cudnn64_65.dll to `./bin/`
-- Goto directory `./examples/mnist`
-- Double click `get_mnist_leveldb.bat` to download the dataset in leveldb format.(ignore)
-- Double click `train_lenet.bat` to see the training progress .
+### Citing ParseNet
 
-#### Performance
-- I have trained mnist on K40 with this windows version, take 40 seconds. The original windows-caffe taken about 5 minutes to train mnist. 
+Please cite ParseNet in your publications if it helps your research:
 
-#### Tips
-- It takes obvious longer time when you compile for the first time. Therefore please refrain from using `clean & rebuild`.
-- To support different [GPU compute capabilities](http://en.wikipedia.org/wiki/CUDA#Supported_GPUs), the code is built for several compute capability versions. If you know the exact version of your GPU device, you may remove the support to other versions to speed up the compiling procedure. You may wish to take a look at #25 for more details.
+    @article{liu15parsenet,
+      Author = {Liu, Wei and Rabinovich, Andrew and Berg, Alexander},
+      Journal = {arXiv preprint arXiv:1506.04579},
+      Title = {ParseNet: Looking Wider to See Better},
+      Year = {2015}
+    }
 
-#### Known Issues
-- ~~I have trained on ImageNet with this windows porting as well. The speed is much slower than the one built on Ubuntu. 20 iterations take 79s on Windows, whereas same number of iterations take about 30s on Ubuntu (on GTX Titan).~~
-- The above issue has been solved since the upgrade of GPU driver to 340.62 and CUDA to 6.5. The same hardware is now running 26 sencods for 20 iterations on Windows. Hooray!!
+### Contents
+1. [Installation](#installation)
+2. [Model](#model)
 
-#### Bug Report
-- Please create new issues in [github](https://github.com/niuzhiheng/caffe/issues) if you find any bug.
-- If you have new pull requests, they are very welcome.
-- Before you do that, you may wish to read this [wiki page](https://github.com/niuzhiheng/caffe/wiki) for more information.
+### Installation
+1. Get the code
+  ```Shell
+  git clone https://github.com/weiliu89/caffe.git
+  git checkout fcn
+  ```
 
+2. Build the code. Please follow [Caffe instruction](http://caffe.berkeleyvision.org/installation.html) to install all necessary packages and build it.
+  ```Shell
+  make -j8
+  make mat
+  make py
+  make test -j8
+  make runtest -j8
+  ```
 
-Please let me know if you found issues.
+  **Note:** Since ParseNet merges [#2016](https://github.com/BVLC/caffe/pull/2016), which will cause a crash on exit. You can safely ignore it as it is a known side effect.
 
-Thanks @happynear and NIU ZHIHENG (https://github.com/niuzhiheng/caffe) for contribution caffe on windows.
+    syncedmem.cpp:16] Check failed: error == cudaSuccess (29 vs. 0) driver shutting down
+
+### Model
+The ParseNet model and solver on PASCAL has been shared at the [Caffe's Model Zoo](https://github.com/BVLC/caffe/wiki/Model-Zoo). Please check it out for more details.

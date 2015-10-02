@@ -17,10 +17,42 @@ template <typename Dtype>
 void PoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   PoolingParameter pool_param = this->layer_param_.pooling_param();
+  // TODO(Wei): Cleaner way to switch between options
+  if (pool_param.has_bin_size() ||
+      (pool_param.has_bin_h() || pool_param.has_bin_w())) {
+    CHECK(pool_param.has_bin_size() ||
+          (pool_param.has_bin_h() && pool_param.has_bin_w()))
+        << "For non-grid bins both bin_h and bin_w are required.";
+    if (pool_param.has_bin_size()) {
+      bin_h_ = bin_w_ = pool_param.bin_size();
+    } else {
+      bin_h_ = pool_param.bin_h();
+      bin_w_ = pool_param.bin_w();
+    }
+    channels_ = bottom[0]->channels();
+    height_ = bottom[0]->height();
+    width_ = bottom[0]->width();
+    CHECK_GT(bin_h_, 0) << "Bin # in height direction cannot be zero.";
+    CHECK_GT(bin_w_, 0) << "Bin # in width direction cannot be zero.";
+    CHECK_LE(bin_h_, height_ / 2) << "Bin # in height direction cannot be larger than half of height.";
+    CHECK_LE(bin_w_, width_ / 2) << "Bin # in width direction cannot be larger than half of width.";
+    // dynamically decide kernel, stride, and pad
+    kernel_h_ = static_cast<int>(ceil(static_cast<float>(height_) / bin_h_));
+    kernel_w_ = static_cast<int>(ceil(static_cast<float>(width_) / bin_w_));
+    stride_h_ = kernel_h_ == height_ ? 1 : kernel_h_;
+    stride_w_ = kernel_w_ == width_ ? 1 : kernel_w_;
+    pad_h_ = static_cast<int>(floor(static_cast<float>(bin_h_ - 1) * stride_h_
+                                    + kernel_h_ - height_) / 2);
+    pad_w_ = static_cast<int>(floor(static_cast<float>(bin_w_ - 1) * stride_w_
+                                    + kernel_w_ - width_) / 2);
+  } else {
   if (pool_param.global_pooling()) {
     CHECK(!(pool_param.has_kernel_size() ||
       pool_param.has_kernel_h() || pool_param.has_kernel_w()))
       << "With Global_pooling: true Filter size cannot specified";
+    CHECK(!(pool_param.has_bin_size() ||
+      pool_param.has_bin_h() || pool_param.has_bin_w()))
+      << "With Global_pooling: cannot use bin option";
   } else {
     CHECK(!pool_param.has_kernel_size() !=
       !(pool_param.has_kernel_h() && pool_param.has_kernel_w()))
@@ -76,6 +108,7 @@ void PoolingLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     CHECK_LT(pad_h_, kernel_h_);
     CHECK_LT(pad_w_, kernel_w_);
   }
+  }
 }
 
 template <typename Dtype>
@@ -86,7 +119,19 @@ void PoolingLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   channels_ = bottom[0]->channels();
   height_ = bottom[0]->height();
   width_ = bottom[0]->width();
-  if (global_pooling_) {
+  PoolingParameter pool_param = this->layer_param_.pooling_param();
+  if (pool_param.has_bin_size() ||
+      (pool_param.has_bin_h() || pool_param.has_bin_w())) {
+    // dynamically decide kernel, stride, and pad
+    kernel_h_ = static_cast<int>(ceil(static_cast<float>(height_) / bin_h_));
+    kernel_w_ = static_cast<int>(ceil(static_cast<float>(width_) / bin_w_));
+    stride_h_ = kernel_h_ == height_ ? 1 : kernel_h_;
+    stride_w_ = kernel_w_ == width_ ? 1 : kernel_w_;
+    pad_h_ = static_cast<int>(floor(static_cast<float>(bin_h_ - 1) * stride_h_
+                                    + kernel_h_ - height_) / 2);
+    pad_w_ = static_cast<int>(floor(static_cast<float>(bin_w_ - 1) * stride_w_
+                                    + kernel_w_ - width_) / 2);
+  } else if (global_pooling_) {
     kernel_h_ = bottom[0]->height();
     kernel_w_ = bottom[0]->width();
   }
