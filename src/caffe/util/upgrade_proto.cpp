@@ -476,8 +476,6 @@ V1LayerParameter_LayerType UpgradeV0LayerType(const string& type) {
     return V1LayerParameter_LayerType_CONCAT;
   } else if (type == "conv") {
     return V1LayerParameter_LayerType_CONVOLUTION;
-  } else if (type == "crop") {
-    return V1LayerParameter_LayerType_CROP;
   } else if (type == "data") {
     return V1LayerParameter_LayerType_DATA;
   } else if (type == "dropout") {
@@ -590,8 +588,8 @@ bool UpgradeNetAsNeeded(const string& param_file, NetParameter* param) {
   if (NetNeedsV0ToV1Upgrade(*param)) {
     // NetParameter was specified using the old style (V0LayerParameter); try to
     // upgrade it.
-    LOG(ERROR) << "Attempting to upgrade input file specified using deprecated "
-               << "V0LayerParameter: " << param_file;
+    LOG(INFO) << "Attempting to upgrade input file specified using deprecated "
+              << "V0LayerParameter: " << param_file;
     NetParameter original_param(*param);
     if (!UpgradeV0Net(original_param, param)) {
       success = false;
@@ -601,29 +599,29 @@ bool UpgradeNetAsNeeded(const string& param_file, NetParameter* param) {
       LOG(INFO) << "Successfully upgraded file specified using deprecated "
                 << "V0LayerParameter";
     }
-    LOG(ERROR) << "Note that future Caffe releases will not support "
+    LOG(WARNING) << "Note that future Caffe releases will not support "
         << "V0NetParameter; use ./build/tools/upgrade_net_proto_text for "
         << "prototxt and ./build/tools/upgrade_net_proto_binary for model "
         << "weights upgrade this and any other net protos to the new format.";
   }
   // NetParameter uses old style data transformation fields; try to upgrade it.
   if (NetNeedsDataUpgrade(*param)) {
-    LOG(ERROR) << "Attempting to upgrade input file specified using deprecated "
-               << "transformation parameters: " << param_file;
+    LOG(INFO) << "Attempting to upgrade input file specified using deprecated "
+              << "transformation parameters: " << param_file;
     UpgradeNetDataTransformation(param);
     LOG(INFO) << "Successfully upgraded file specified using deprecated "
               << "data transformation parameters.";
-    LOG(ERROR) << "Note that future Caffe releases will only support "
-               << "transform_param messages for transformation fields.";
+    LOG(WARNING) << "Note that future Caffe releases will only support "
+                 << "transform_param messages for transformation fields.";
   }
   if (NetNeedsV1ToV2Upgrade(*param)) {
-    LOG(ERROR) << "Attempting to upgrade input file specified using deprecated "
-               << "V1LayerParameter: " << param_file;
+    LOG(INFO) << "Attempting to upgrade input file specified using deprecated "
+              << "V1LayerParameter: " << param_file;
     NetParameter original_param(*param);
     if (!UpgradeV1Net(original_param, param)) {
       success = false;
       LOG(ERROR) << "Warning: had one or more problems upgrading "
-          << "V1LayerParameter (see above); continuing anyway.";
+                 << "V1LayerParameter (see above); continuing anyway.";
     } else {
       LOG(INFO) << "Successfully upgraded file specified using deprecated "
                 << "V1LayerParameter";
@@ -782,10 +780,6 @@ bool UpgradeV1LayerParameter(const V1LayerParameter& v1_layer_param,
     layer_param->mutable_memory_data_param()->CopyFrom(
         v1_layer_param.memory_data_param());
   }
-  if (v1_layer_param.has_multi_stage_meanfield_param()) {
-    layer_param->mutable_multi_stage_meanfield_param()->CopyFrom(
-        v1_layer_param.multi_stage_meanfield_param());
-  }
   if (v1_layer_param.has_mvn_param()) {
     layer_param->mutable_mvn_param()->CopyFrom(
         v1_layer_param.mvn_param());
@@ -834,10 +828,6 @@ bool UpgradeV1LayerParameter(const V1LayerParameter& v1_layer_param,
     layer_param->mutable_loss_param()->CopyFrom(
         v1_layer_param.loss_param());
   }
-  if (v1_layer_param.has_parse_evaluate_param()) {
-    layer_param->mutable_parse_evaluate_param()->CopyFrom(
-        v1_layer_param.parse_evaluate_param());
-  }
   if (v1_layer_param.has_layer()) {
     LOG(ERROR) << "Input NetParameter has V0 layer -- ignoring.";
     is_fully_compatible = false;
@@ -863,8 +853,6 @@ const char* UpgradeV1LayerType(const V1LayerParameter_LayerType type) {
     return "ContrastiveLoss";
   case V1LayerParameter_LayerType_CONVOLUTION:
     return "Convolution";
-  case V1LayerParameter_LayerType_CROP:
-    return "Crop";
   case V1LayerParameter_LayerType_DECONVOLUTION:
     return "Deconvolution";
   case V1LayerParameter_LayerType_DATA:
@@ -901,14 +889,8 @@ const char* UpgradeV1LayerType(const V1LayerParameter_LayerType type) {
     return "MemoryData";
   case V1LayerParameter_LayerType_MULTINOMIAL_LOGISTIC_LOSS:
     return "MultinomialLogisticLoss";
-  case V1LayerParameter_LayerType_MULTI_STAGE_MEANFIELD:
-    return "MultiStageMeanfield";
   case V1LayerParameter_LayerType_MVN:
     return "MVN";
-  case V1LayerParameter_LayerType_PARSE_OUTPUT:
-    return "ParseOutput";
-  case V1LayerParameter_LayerType_PARSE_EVALUATE:
-    return "ParseEvaluate";
   case V1LayerParameter_LayerType_POOLING:
     return "Pooling";
   case V1LayerParameter_LayerType_POWER:

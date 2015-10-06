@@ -51,22 +51,6 @@ TYPED_TEST(Im2colLayerTest, TestSetup) {
   EXPECT_EQ(this->blob_top_->width(), 2);
 }
 
-TYPED_TEST(Im2colLayerTest, TestSetupHole) {
-  typedef typename TypeParam::Dtype Dtype;
-  LayerParameter layer_param;
-  ConvolutionParameter* convolution_param =
-      layer_param.mutable_convolution_param();
-  convolution_param->set_kernel_size(2);
-  convolution_param->set_stride(2);
-  convolution_param->set_filter_stride(2);
-  Im2colLayer<Dtype> layer(layer_param);
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  EXPECT_EQ(this->blob_top_->num(), 2);
-  EXPECT_EQ(this->blob_top_->channels(), 12);
-  EXPECT_EQ(this->blob_top_->height(), 2);
-  EXPECT_EQ(this->blob_top_->width(), 2);
-}
-
 TYPED_TEST(Im2colLayerTest, TestForward) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
@@ -84,73 +68,6 @@ TYPED_TEST(Im2colLayerTest, TestForward) {
   }
 }
 
-TYPED_TEST(Im2colLayerTest, TestForwardHole) {
-  typedef typename TypeParam::Dtype Dtype;
-  LayerParameter layer_param;
-  ConvolutionParameter* convolution_param =
-      layer_param.mutable_convolution_param();
-  convolution_param->set_kernel_size(2);
-  convolution_param->set_stride(1);
-  convolution_param->set_filter_stride(2);
-  Im2colLayer<Dtype> layer(layer_param);
-  layer.SetUp(this->blob_bottom_vec_, this->blob_top_vec_);
-  CHECK_EQ(this->blob_top_->channels(), 12);
-  CHECK_EQ(this->blob_top_->width(), 3);
-  CHECK_EQ(this->blob_top_->height(), 4);
-  layer.Forward(this->blob_bottom_vec_, this->blob_top_vec_);
-  // We are lazy and will only check the top left block
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 0, 0),
-            this->blob_top_->data_at(0, 0, 0, 0));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 0, 2),
-            this->blob_top_->data_at(0, 1, 0, 0));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 0, 1),
-            this->blob_top_->data_at(0, 0, 0, 1));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 0, 3),
-            this->blob_top_->data_at(0, 1, 0, 1));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 0, 2),
-            this->blob_top_->data_at(0, 0, 0, 2));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 0, 4),
-            this->blob_top_->data_at(0, 1, 0, 2));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 2, 0),
-            this->blob_top_->data_at(0, 2, 0, 0));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 2, 2),
-            this->blob_top_->data_at(0, 3, 0, 0));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 2, 1),
-            this->blob_top_->data_at(0, 2, 0, 1));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 2, 3),
-            this->blob_top_->data_at(0, 3, 0, 1));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 2, 2),
-            this->blob_top_->data_at(0, 2, 0, 2));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 0, 2, 4),
-            this->blob_top_->data_at(0, 3, 0, 2));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 1, 0, 0),
-            this->blob_top_->data_at(0, 4, 0, 0));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 1, 0, 2),
-            this->blob_top_->data_at(0, 5, 0, 0));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 1, 0, 1),
-            this->blob_top_->data_at(0, 4, 0, 1));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 1, 0, 3),
-            this->blob_top_->data_at(0, 5, 0, 1));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 1, 0, 2),
-            this->blob_top_->data_at(0, 4, 0, 2));
-  EXPECT_EQ(this->blob_bottom_->data_at(0, 1, 0, 4),
-            this->blob_top_->data_at(0, 5, 0, 2));
-}
-
-TYPED_TEST(Im2colLayerTest, TestGradientHole) {
-  typedef typename TypeParam::Dtype Dtype;
-  LayerParameter layer_param;
-  ConvolutionParameter* convolution_param =
-      layer_param.mutable_convolution_param();
-  convolution_param->set_kernel_size(2);
-  convolution_param->set_stride(1);
-  convolution_param->set_filter_stride(2);
-  Im2colLayer<Dtype> layer(layer_param);
-  GradientChecker<Dtype> checker(1e-2, 1e-2);
-  checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
-      this->blob_top_vec_);
-}
-
 TYPED_TEST(Im2colLayerTest, TestGradient) {
   typedef typename TypeParam::Dtype Dtype;
   LayerParameter layer_param;
@@ -163,6 +80,7 @@ TYPED_TEST(Im2colLayerTest, TestGradient) {
   checker.CheckGradientExhaustive(&layer, this->blob_bottom_vec_,
       this->blob_top_vec_);
 }
+
 
 TYPED_TEST(Im2colLayerTest, TestRect) {
   typedef typename TypeParam::Dtype Dtype;

@@ -9,14 +9,6 @@
 namespace caffe {
 
 template <typename Dtype>
-void SigmoidCrossEntropyLossLayer<Dtype>::Forward_gpu(
-    const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
-  // Since we've only implemented a GPU backward, fall back to CPU
-  // (we need to do this explicitly for the instantiation macro to work).
-  Forward_cpu(bottom, top);
-}
-
-template <typename Dtype>
 void SigmoidCrossEntropyLossLayer<Dtype>::Backward_gpu(
     const vector<Blob<Dtype>*>& top, const vector<bool>& propagate_down,
     const vector<Blob<Dtype>*>& bottom) {
@@ -39,7 +31,7 @@ void SigmoidCrossEntropyLossLayer<Dtype>::Backward_gpu(
   }
 }
 
-INSTANTIATE_LAYER_GPU_FUNCS(SigmoidCrossEntropyLossLayer);
+INSTANTIATE_LAYER_GPU_BACKWARD(SigmoidCrossEntropyLossLayer);
 
 
 }  // namespace caffe

@@ -207,6 +207,16 @@ void caffe_exp<double>(const int n, const double* a, double* y) {
 }
 
 template <>
+void caffe_log<float>(const int n, const float* a, float* y) {
+  vsLn(n, a, y);
+}
+
+template <>
+void caffe_log<double>(const int n, const double* a, double* y) {
+  vdLn(n, a, y);
+}
+
+template <>
 void caffe_abs<float>(const int n, const float* a, float* y) {
     vsAbs(n, a, y);
 }
@@ -337,6 +347,11 @@ float caffe_cpu_dot<float>(const int n, const float* x, const float* y);
 
 template
 double caffe_cpu_dot<double>(const int n, const double* x, const double* y);
+
+#ifdef _MSC_VER
+#define __builtin_popcount __popcnt
+#define __builtin_popcountl __popcnt64
+#endif
 
 template <>
 int caffe_cpu_hamming_distance<float>(const int n, const float* x,

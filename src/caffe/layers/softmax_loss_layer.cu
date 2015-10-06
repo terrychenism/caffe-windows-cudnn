@@ -53,11 +53,7 @@ void SoftmaxWithLossLayer<Dtype>::Forward_gpu(
   if (normalize_) {
     Dtype count;
     caffe_gpu_asum(nthreads, counts, &count);
-    if (count > 0) {
-      loss /= count;
-    } else {
-      loss = 0;
-    }
+    loss /= count;
   } else {
     loss /= outer_num_;
   }
@@ -117,9 +113,7 @@ void SoftmaxWithLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     if (normalize_) {
       Dtype count;
       caffe_gpu_asum(nthreads, counts, &count);
-      if (count > 0) {
-        caffe_gpu_scal(prob_.count(), loss_weight / count, bottom_diff);
-      }
+      caffe_gpu_scal(prob_.count(), loss_weight / count, bottom_diff);
     } else {
       caffe_gpu_scal(prob_.count(), loss_weight / outer_num_, bottom_diff);
     }
