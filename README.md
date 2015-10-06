@@ -1,1 +1,1 @@
-# crfasrnn
+# hungarian and hinge rank loss
