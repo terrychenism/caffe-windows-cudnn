@@ -163,7 +163,7 @@ class ContrastiveLossLayer : public LossLayer<Dtype> {
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
 
-  virtual inline int ExactNumBottomBlobs() const { return 4; }
+  virtual inline int ExactNumBottomBlobs() const { return 3; }
   virtual inline const char* type() const { return "ContrastiveLoss"; }
   /**
    * Unlike most loss layers, in the ContrastiveLossLayer we can backpropagate
@@ -414,38 +414,11 @@ protected:
 	virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
 		const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
 
-	vector<vector<Dtype>> marginWithLoss_;
+	vector< vector<Dtype> > marginWithLoss_;
 	vector<Dtype*> word2vec;
 	int class_num;
 	int label_dim;
 };
-
-template <typename Dtype>
-class HungarianLossLayer : public LossLayer<Dtype> {
-public:
-	explicit HungarianLossLayer(const LayerParameter& param)
-		: LossLayer<Dtype>(param) {}
-	virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
-		const vector<Blob<Dtype>*>& top);
-
-	virtual inline const char* type() const { return "HungarianLoss"; }
-	virtual inline int ExactNumBottomBlobs() const { return 3; }
-	virtual inline int ExactNumTopBlobs() const { return -1; }
-
-protected:
-	/// @copydoc HungarianLossLayer
-	virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
-		const vector<Blob<Dtype>*>& top);
-
-	virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
-		const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
-
-	vector<vector<int> > assignments_;
-	vector<int> num_gt_;
-	float match_ratio_;
-};
-
-
 /**
  * @brief A generalization of MultinomialLogisticLossLayer that takes an
  *        "information gain" (infogain) matrix specifying the "value" of all label
@@ -764,7 +737,6 @@ class SoftmaxWithLossLayer : public LossLayer<Dtype> {
   virtual inline int MaxTopBlobs() const { return 2; }
 
  protected:
-  /// @copydoc SoftmaxWithLossLayer
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
   virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,

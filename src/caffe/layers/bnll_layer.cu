@@ -6,7 +6,7 @@
 
 namespace caffe {
 
-__device__ __constant__  float kBNLL_THRESHOLD = 50.;
+const float kBNLL_THRESHOLD = 50.;
 
 template <typename Dtype>
 __global__ void BNLLForward(const int n, const Dtype* in, Dtype* out) {

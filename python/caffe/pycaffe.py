@@ -5,12 +5,13 @@ interface.
 
 from collections import OrderedDict
 try:
-	from itertools import izip_longest
+    from itertools import izip_longest
 except:
-	from itertools import zip_longest as izip_longest
+    from itertools import zip_longest as izip_longest
 import numpy as np
 
-from ._caffe import Net, SGDSolver
+from ._caffe import Net, SGDSolver, NesterovSolver, AdaGradSolver, \
+        RMSPropSolver, AdaDeltaSolver, AdamSolver
 import caffe.io
 
 # We directly update methods from Net here (rather than using composition or
@@ -25,6 +26,15 @@ def _Net_blobs(self):
     blobs indexed by name
     """
     return OrderedDict(zip(self._blob_names, self._blobs))
+
+
+@property
+def _Net_blob_loss_weights(self):
+    """
+    An OrderedDict (bottom to top, i.e., input to output) of network
+    blob loss weights indexed by name
+    """
+    return OrderedDict(zip(self._blob_names, self._blob_loss_weights))
 
 
 @property
@@ -53,16 +63,19 @@ def _Net_forward(self, blobs=None, start=None, end=None, **kwargs):
     """
     Forward pass: prepare inputs and run the net forward.
 
-    Take
-    blobs: list of blobs to return in addition to output blobs.
-    kwargs: Keys are input blob names and values are blob ndarrays.
-            For formatting inputs for Caffe, see Net.preprocess().
-            If None, input is taken from data layers.
-    start: optional name of layer at which to begin the forward pass
-    end: optional name of layer at which to finish the forward pass (inclusive)
+    Parameters
+    ----------
+    blobs : list of blobs to return in addition to output blobs.
+    kwargs : Keys are input blob names and values are blob ndarrays.
+             For formatting inputs for Caffe, see Net.preprocess().
+             If None, input is taken from data layers.
+    start : optional name of layer at which to begin the forward pass
+    end : optional name of layer at which to finish the forward pass
+          (inclusive)
 
-    Give
-    outs: {blob name: blob ndarray} dict.
+    Returns
+    -------
+    outs : {blob name: blob ndarray} dict.
     """
     if blobs is None:
         blobs = []
@@ -99,14 +112,17 @@ def _Net_backward(self, diffs=None, start=None, end=None, **kwargs):
     """
     Backward pass: prepare diffs and run the net backward.
 
-    Take
-    diffs: list of diffs to return in addition to bottom diffs.
-    kwargs: Keys are output blob names and values are diff ndarrays.
+    Parameters
+    ----------
+    diffs : list of diffs to return in addition to bottom diffs.
+    kwargs : Keys are output blob names and values are diff ndarrays.
             If None, top diffs are taken from forward loss.
-    start: optional name of layer at which to begin the backward pass
-    end: optional name of layer at which to finish the backward pass (inclusive)
+    start : optional name of layer at which to begin the backward pass
+    end : optional name of layer at which to finish the backward pass
+        (inclusive)
 
-    Give
+    Returns
+    -------
     outs: {blob name: diff ndarray} dict.
     """
     if diffs is None:
@@ -146,13 +162,15 @@ def _Net_forward_all(self, blobs=None, **kwargs):
     """
     Run net forward in batches.
 
-    Take
-    blobs: list of blobs to extract as in forward()
-    kwargs: Keys are input blob names and values are blob ndarrays.
-            Refer to forward().
+    Parameters
+    ----------
+    blobs : list of blobs to extract as in forward()
+    kwargs : Keys are input blob names and values are blob ndarrays.
+             Refer to forward().
 
-    Give
-    all_outs: {blob name: list of blobs} dict.
+    Returns
+    -------
+    all_outs : {blob name: list of blobs} dict.
     """
     # Collect outputs from batches
     all_outs = {out: [] for out in set(self.outputs + (blobs or []))}
@@ -175,14 +193,16 @@ def _Net_forward_backward_all(self, blobs=None, diffs=None, **kwargs):
     """
     Run net forward + backward in batches.
 
-    Take
+    Parameters
+    ----------
     blobs: list of blobs to extract as in forward()
     diffs: list of diffs to extract as in backward()
     kwargs: Keys are input (for forward) and output (for backward) blob names
             and values are ndarrays. Refer to forward() and backward().
             Prefilled variants are called for lack of input or output blobs.
 
-    Give
+    Returns
+    -------
     all_blobs: {blob name: blob ndarray} dict.
     all_diffs: {blob name: diff ndarray} dict.
     """
@@ -229,11 +249,13 @@ def _Net_batch(self, blobs):
     """
     Batch blob lists according to net's batch size.
 
-    Take
+    Parameters
+    ----------
     blobs: Keys blob names and values are lists of blobs (of any length).
            Naturally, all the lists should have the same length.
 
-    Give (yield)
+    Yields
+    ------
     batch: {blob name: list of blobs} dict for a single batch.
     """
     num = len(blobs.itervalues().next())
@@ -258,6 +280,7 @@ def _Net_batch(self, blobs):
 
 # Attach methods to Net.
 Net.blobs = _Net_blobs
+Net.blob_loss_weights = _Net_blob_loss_weights
 Net.params = _Net_params
 Net.forward = _Net_forward
 Net.backward = _Net_backward

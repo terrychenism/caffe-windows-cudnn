@@ -21,7 +21,8 @@ namespace caffe {
  *
  * Intended for use after a classification layer to produce a prediction.
  * If parameter out_max_val is set to true, output is a vector of pairs
- * (max_ind, max_val) for each image.
+ * (max_ind, max_val) for each image. The axis parameter specifies an axis
+ * along which to maximise.
  *
  * NOTE: does not implement Backwards operation.
  */
@@ -34,7 +35,11 @@ class ArgMaxLayer : public Layer<Dtype> {
    *   - top_k (\b optional uint, default 1).
    *     the number @f$ K @f$ of maximal items to output.
    *   - out_max_val (\b optional bool, default false).
-   *     if set, output a vector of pairs (max_ind, max_val) for each image.
+   *     if set, output a vector of pairs (max_ind, max_val) unless axis is set then
+   *     output max_val along the specified axis.
+   *   - axis (\b optional int).
+   *     if set, maximise along the specified axis else maximise the flattened
+   *     trailing dimensions for each index of the first / num dimension.
    */
   explicit ArgMaxLayer(const LayerParameter& param)
       : Layer<Dtype>(param) {}
@@ -54,7 +59,8 @@ class ArgMaxLayer : public Layer<Dtype> {
    *      the inputs @f$ x @f$
    * @param top output Blob vector (length 1)
    *   -# @f$ (N \times 1 \times K \times 1) @f$ or, if out_max_val
-   *      @f$ (N \times 2 \times K \times 1) @f$
+   *      @f$ (N \times 2 \times K \times 1) @f$ unless axis set than e.g.
+   *      @f$ (N \times K \times H \times W) @f$ if axis == 1
    *      the computed outputs @f$
    *       y_n = \arg\max\limits_i x_{ni}
    *      @f$ (for @f$ K = 1 @f$).
@@ -68,6 +74,8 @@ class ArgMaxLayer : public Layer<Dtype> {
   }
   bool out_max_val_;
   size_t top_k_;
+  bool has_axis_;
+  int axis_;
 };
 
 /**
@@ -85,7 +93,7 @@ class ConcatLayer : public Layer<Dtype> {
       const vector<Blob<Dtype>*>& top);
 
   virtual inline const char* type() const { return "Concat"; }
-  virtual inline int MinBottomBlobs() const { return 2; }
+  virtual inline int MinBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
  protected:
@@ -216,6 +224,64 @@ class EmbedLayer : public Layer<Dtype> {
   int N_;
   bool bias_term_;
   Blob<Dtype> bias_multiplier_;
+};
+
+
+/**
+* @brief Count the prediction and ground truth statistics for each datum.
+*
+* NOTE: This does not implement Backwards operation.
+*/
+template <typename Dtype>
+class EvaluateLayer : public Layer<Dtype> {
+public:
+  /**
+  * @param param provides ParseEvaluateParameter parse_evaluate_param,
+  *     with ParseEvaluateLayer options:
+  *   - num_labels (\b optional int32.).
+  *     number of labels. must provide!!
+  *   - ignore_label (\b repeated int32).
+  *     If any, ignore evaluating the corresponding label for each
+  *     image.
+  */
+  explicit EvaluateLayer(const LayerParameter& param)
+    : Layer<Dtype>(param) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+    const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+    const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "ParseEvaluate"; }
+  virtual inline int ExactNumBottomBlobs() const { return 2; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+
+protected:
+  /**
+  * @param bottom input Blob vector (length 2)
+  *   -# @f$ (N \times 1 \times H \times W) @f$
+  *      the prediction label @f$ x @f$
+  *   -# @f$ (N \times 1 \times H \times W) @f$
+  *      the ground truth label @f$ x @f$
+  * @param top output Blob vector (length 1)
+  *   -# @f$ (N \times C \times 1 \times 3) @f$
+  *      the counts for different class @f$
+  */
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+    const vector<Blob<Dtype>*>& top);
+  /// @brief Not implemented (non-differentiable function)
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
+    NOT_IMPLEMENTED;
+  }
+
+  // number of total labels
+  int num_labels_;
+  // store ignored labels
+  std::set<Dtype> ignore_labels_;
+
+  int class_num;
+  int label_dim;
+  vector<Dtype*> word2vec;
 };
 
 /**
@@ -625,7 +691,7 @@ class SliceLayer : public Layer<Dtype> {
 
   virtual inline const char* type() const { return "Slice"; }
   virtual inline int ExactNumBottomBlobs() const { return 1; }
-  virtual inline int MinTopBlobs() const { return 2; }
+  virtual inline int MinTopBlobs() const { return 1; }
 
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,

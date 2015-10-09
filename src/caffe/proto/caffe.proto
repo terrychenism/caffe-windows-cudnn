@@ -48,7 +48,6 @@ message FillerParameter {
   optional float max = 4 [default = 1]; // the max value in uniform filler
   optional float mean = 5 [default = 0]; // the mean value in Gaussian filler
   optional float std = 6 [default = 1]; // the std value in Gaussian filler
-  optional float alpha = 9 [default = 0]; // the alpha in equation 15 of <Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification>
   // The expected number of non-zero output weights for a given input in
   // Gaussian filler -- the default -1 means don't perform sparsification.
   optional int32 sparse = 7 [default = -1];
@@ -99,7 +98,7 @@ message NetParameter {
 // NOTE
 // Update the next available ID when you add a new SolverParameter field.
 //
-// SolverParameter next available ID: 37 (last added: iter_size)
+// SolverParameter next available ID: 40 (last added: momentum2)
 message SolverParameter {
   //////////////////////////////////////////////////////////////////////////////
   // Specifying the train and test networks
@@ -302,7 +301,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 146 (last added:  HungarianLoss)
+// LayerParameter next available layer-specific ID: 141 (last added: evaluate_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -360,12 +359,12 @@ message LayerParameter {
   optional EltwiseParameter eltwise_param = 110;
   optional EmbedParameter embed_param = 137;
   optional ExpParameter exp_param = 111;
+  optional EvaluateParameter evaluate_param = 140;
   optional FlattenParameter flatten_param = 135;
   optional HDF5DataParameter hdf5_data_param = 112;
   optional HDF5OutputParameter hdf5_output_param = 113;
   optional HingeLossParameter hinge_loss_param = 114;
-  optional HingeRankLossParameter hinge_rank_loss_param = 144;
-  optional HungarianLossParameter hungarian_loss_param = 145;
+  optional HingeRankLossParameter hinge_rank_loss_param = 139;
   optional ImageDataParameter image_data_param = 115;
   optional InfogainLossParameter infogain_loss_param = 116;
   optional InnerProductParameter inner_product_param = 117;
@@ -388,11 +387,6 @@ message LayerParameter {
   optional ThresholdParameter threshold_param = 128;
   optional TileParameter tile_param = 138;
   optional WindowDataParameter window_data_param = 129;
-  optional BNParameter bn_param = 139;
-  optional LocalParameter local_param = 140;
-  optional InsanityParameter insanity_param = 141;
-  optional TripletLossParameter triplet_loss_param = 142;
-  optional ROIPoolingParameter roi_pooling_param = 143;
 }
 
 // Message that stores parameters used to apply transformation
@@ -416,12 +410,6 @@ message TransformationParameter {
   optional bool force_color = 6 [default = false];
   // Force the decoded image to have 1 color channels.
   optional bool force_gray = 7 [default = false];
-  // Add gaussian noise.
-  optional float gaussian_noise_std = 8 [default = 1];
-  // Add uniform noise.
-  optional float uniform_noise_range = 9 [default = 1];
-  // noise mask
-  optional float noise_mask_ratio = 10 [default = 1];
 }
 
 // Message that stores parameters shared by loss layers
@@ -457,6 +445,11 @@ message ArgMaxParameter {
   // If true produce pairs (argmax, maxval)
   optional bool out_max_val = 1 [default = false];
   optional uint32 top_k = 2 [default = 1];
+  // The axis along which to maximise -- may be negative to index from the
+  // end (e.g., -1 for the last axis).
+  // By default ArgMaxLayer maximizes over the flattened trailing dimensions
+  // for each index of the first / num dimension.
+  optional int32 axis = 3;
 }
 
 message ConcatParameter {
@@ -485,18 +478,24 @@ message ContrastiveLossParameter {
 message ConvolutionParameter {
   optional uint32 num_output = 1; // The number of outputs for the layer
   optional bool bias_term = 2 [default = true]; // whether to have bias terms
+
   // Pad, kernel size, and stride are all given as a single value for equal
-  // dimensions in height and width or as Y, X pairs.
-  optional uint32 pad = 3 [default = 0]; // The padding size (equal in Y, X)
-  optional uint32 pad_h = 9 [default = 0]; // The padding height
-  optional uint32 pad_w = 10 [default = 0]; // The padding width
-  optional uint32 kernel_size = 4; // The kernel size (square)
-  optional uint32 kernel_h = 11; // The kernel height
-  optional uint32 kernel_w = 12; // The kernel width
+  // dimensions in all spatial dimensions, or once per spatial dimension.
+  repeated uint32 pad = 3; // The padding size; defaults to 0
+  repeated uint32 kernel_size = 4; // The kernel size
+  repeated uint32 stride = 6; // The stride; defaults to 1
+
+  // For 2D convolution only, the *_h and *_w versions may also be used to
+  // specify both spatial dimensions.
+  optional uint32 pad_h = 9 [default = 0]; // The padding height (2D only)
+  optional uint32 pad_w = 10 [default = 0]; // The padding width (2D only)
+  optional uint32 kernel_h = 11; // The kernel height (2D only)
+  optional uint32 kernel_w = 12; // The kernel width (2D only)
+  optional uint32 stride_h = 13; // The stride height (2D only)
+  optional uint32 stride_w = 14; // The stride width (2D only)
+
   optional uint32 group = 5 [default = 1]; // The group size for group conv
-  optional uint32 stride = 6 [default = 1]; // The stride (equal in Y, X)
-  optional uint32 stride_h = 13; // The stride height
-  optional uint32 stride_w = 14; // The stride width
+
   optional FillerParameter weight_filler = 7; // The filler for the weight
   optional FillerParameter bias_filler = 8; // The filler for the bias
   enum Engine {
@@ -505,6 +504,24 @@ message ConvolutionParameter {
     CUDNN = 2;
   }
   optional Engine engine = 15 [default = DEFAULT];
+
+  // The axis to interpret as "channels" when performing convolution.
+  // Preceding dimensions are treated as independent inputs;
+  // succeeding dimensions are treated as "spatial".
+  // With (N, C, H, W) inputs, and axis == 1 (the default), we perform
+  // N independent 2D convolutions, sliding C-channel (or (C/g)-channels, for
+  // groups g>1) filters across the spatial axes (H, W) of the input.
+  // With (N, C, D, H, W) inputs, and axis == 1, we perform
+  // N independent 3D convolutions, sliding (C/g)-channels
+  // filters across the spatial axes (D, H, W) of the input.
+  optional int32 axis = 16 [default = 1];
+
+  // Whether to force use of the general ND convolution, even if a specific
+  // implementation for blobs of the appropriate number of spatial dimensions
+  // is available. (Currently, there is only a 2D-specific convolution
+  // implementation; for input blobs with num_axes != 2, this option is
+  // ignored and the ND implementation will be used.)
+  optional bool force_nd_im2col = 17 [default = false];
 }
 
 message DataParameter {
@@ -578,6 +595,14 @@ message EltwiseParameter {
   optional bool stable_prod_grad = 3 [default = true];
 }
 
+message EvaluateParameter {
+  // Number of total labels. Must provide.
+  optional int32 num_labels = 1;
+  // Ignore evaluating following labels.
+  repeated int32 ignore_label = 2;
+  optional string word2vec=3 [default = "par.w2v"];
+}
+
 // Message that stores parameters used by EmbedLayer
 message EmbedParameter {
   optional uint32 num_output = 1; // The number of outputs for the layer
@@ -643,14 +668,8 @@ message HingeLossParameter {
 }
 
 message HingeRankLossParameter{
-	optional float margin = 1 [default = 1.0];
-}
-
-message HungarianLossParameter {
-  // This parameter sets the strictness of the overlap criterion
-  optional float match_ratio = 1 [default = 0.5];
-  // This parameter disallows permutations when set to false
-  optional bool permute_matches = 2 [default = true];
+  optional float margin = 1 [default = 1.0];
+  optional string word2vec = 2 [default = "par.w2v"];
 }
 
 message ImageDataParameter {
@@ -722,12 +741,6 @@ message LRNParameter {
   }
   optional NormRegion norm_region = 4 [default = ACROSS_CHANNELS];
   optional float k = 5 [default = 1.];
-  enum Engine {
-    DEFAULT = 0;
-    CAFFE = 1;
-    CUDNN = 2;
-  }
-  optional Engine engine = 6 [default = DEFAULT];
 }
 
 message MemoryDataParameter {
@@ -1041,7 +1054,6 @@ message V1LayerParameter {
     HDF5_DATA = 9;
     HDF5_OUTPUT = 10;
     HINGE_LOSS = 28;
-	HINGE_RANK_LOSS = 47;
     IM2COL = 11;
     IMAGE_DATA = 12;
     INFOGAIN_LOSS = 13;
@@ -1063,12 +1075,6 @@ message V1LayerParameter {
     TANH = 23;
     WINDOW_DATA = 24;
     THRESHOLD = 31;
-    LOCAL = 41;
-    BN = 42;
-    NORMALIZE = 43;
-    INSANITY = 44;
-	TRIPLET_LOSS = 45;
-	ROIPOOLING = 46;
   }
   optional LayerType type = 5;
   repeated BlobProto blobs = 6;
@@ -1094,7 +1100,6 @@ message V1LayerParameter {
   optional HDF5DataParameter hdf5_data_param = 13;
   optional HDF5OutputParameter hdf5_output_param = 14;
   optional HingeLossParameter hinge_loss_param = 29;
-  optional HingeRankLossParameter hinge_rank_loss_param = 49;
   optional ImageDataParameter image_data_param = 15;
   optional InfogainLossParameter infogain_loss_param = 16;
   optional InnerProductParameter inner_product_param = 17;
@@ -1113,12 +1118,6 @@ message V1LayerParameter {
   optional TransformationParameter transform_param = 36;
   optional LossParameter loss_param = 42;
   optional V0LayerParameter layer = 1;
-  optional BNParameter bn_param = 43;
-  optional LocalParameter local_param = 44;
-  optional PReLUParameter prelu_param = 45;
-  optional InsanityParameter insanity_param = 46;
-  optional TripletLossParameter triplet_loss_param = 47;
-  optional ROIPoolingParameter roi_pooling_param = 48;
 }
 
 // DEPRECATED: V0LayerParameter is the old way of specifying layer parameters
@@ -1215,30 +1214,6 @@ message V0LayerParameter {
   optional HDF5OutputParameter hdf5_output_param = 1001;
 }
 
-message TripletLossParameter {
-  //margin for negative triplet
-  optional float margin = 1 [default = 1.0];
-}
-
-// Message that stores parameters used by ROIPoolingLayer
-message ROIPoolingParameter {
-  // Pad, kernel size, and stride are all given as a single value for equal
-  // dimensions in height and width or as Y, X pairs.
-  optional uint32 pooled_h = 1 [default = 0]; // The pooled output height
-  optional uint32 pooled_w = 2 [default = 0]; // The pooled output width
-  // Multiplicative spatial scale factor to translate ROI coords from their
-  // input scale to the scale used when pooling
-  optional float spatial_scale = 3 [default = 1];
-}
-
-message InsanityParameter {
-  // Insanity, or Randomized Leaky Rectified Linear Unit, described in
-  // Bing Xu, Naiyan Wang, Tianqi Chen, Mu Li,
-  // Empirical Evaluation of Rectified Activations in Convolution Network
-  
-  optional float lb = 1 [default = 5.];
-  optional float ub = 2 [default = 10.];
-}
 message PReLUParameter {
   // Parametric ReLU described in K. He et al, Delving Deep into Rectifiers:
   // Surpassing Human-Level Performance on ImageNet Classification, 2015.
@@ -1247,23 +1222,4 @@ message PReLUParameter {
   optional FillerParameter filler = 1;
   // Whether or not slope paramters are shared across channels.
   optional bool channel_shared = 2 [default = false];
-}
-// Message that stores parameters used by BNLayer
-message BNParameter {
-  optional FillerParameter scale_filler = 1; // The filler for the scale
-  optional FillerParameter shift_filler = 2; // The filler for the shift
-  optional float var_eps = 3 [default = 1e-10]; // The epsilon added to variance
-  optional bool moving_average = 4 [default = true]; // whether or not using moving average for inference
-  optional float decay = 5 [default = 0.95]; // The decay factor for moving average
-}
-
-// Message that stores parameters used by LocalLayer
-message LocalParameter {
-  optional uint32 num_output = 1; // The number of outputs for the layer
-  optional bool bias_term = 2 [default = true]; // whether to have bias terms
-  optional uint32 pad = 3 [default = 0]; // The padding size
-  optional uint32 kernel_size = 4; // The kernel size
-  optional uint32 stride = 6 [default = 1]; // The stride
-  optional FillerParameter weight_filler = 7; // The filler for the weight
-  optional FillerParameter bias_filler = 8; // The filler for the bias
 }

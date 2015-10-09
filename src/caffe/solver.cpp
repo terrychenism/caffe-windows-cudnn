@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "hdf5/hdf5.h"
-#include "hdf5/hdf5_hl.h"
+#include "hdf5.h"
+#include "hdf5_hl.h"
 
 #include "caffe/net.hpp"
 #include "caffe/proto/caffe.pb.h"
@@ -55,6 +55,7 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
     << std::endl << param.DebugString();
   param_ = param;
   CHECK_GE(param_.average_loss(), 1) << "average_loss should be non-negative.";
+  CheckSnapshotWritePermissions();
   if (Caffe::root_solver() && param_.random_seed() >= 0) {
     Caffe::set_random_seed(param_.random_seed());
   }
@@ -421,17 +422,35 @@ void Solver<Dtype>::Snapshot() {
   CHECK(Caffe::root_solver());
   string model_filename;
   switch (param_.snapshot_format()) {
-    case caffe::SolverParameter_SnapshotFormat_BINARYPROTO:
-      model_filename = SnapshotToBinaryProto();
-      break;
-    case caffe::SolverParameter_SnapshotFormat_HDF5:
-      model_filename = SnapshotToHDF5();
-      break;
-    default:
-      LOG(FATAL) << "Unsupported snapshot format.";
+  case caffe::SolverParameter_SnapshotFormat_BINARYPROTO:
+    model_filename = SnapshotToBinaryProto();
+    break;
+  case caffe::SolverParameter_SnapshotFormat_HDF5:
+    model_filename = SnapshotToHDF5();
+    break;
+  default:
+    LOG(FATAL) << "Unsupported snapshot format.";
   }
 
   SnapshotSolverState(model_filename);
+}
+
+template <typename Dtype>
+void Solver<Dtype>::CheckSnapshotWritePermissions() {
+  if (Caffe::root_solver() && param_.snapshot()) {
+    CHECK(param_.has_snapshot_prefix())
+        << "In solver params, snapshot is specified but snapshot_prefix is not";
+    string probe_filename = SnapshotFilename(".tempfile");
+    std::ofstream probe_ofs(probe_filename.c_str());
+    if (probe_ofs.good()) {
+      probe_ofs.close();
+      std::remove(probe_filename.c_str());
+    } else {
+      LOG(FATAL) << "Cannot write to snapshot prefix '"
+          << param_.snapshot_prefix() << "'.  Make sure "
+          << "that the directory exists and is writeable.";
+    }
+  }
 }
 
 template <typename Dtype>
@@ -439,7 +458,7 @@ string Solver<Dtype>::SnapshotFilename(const string extension) {
   string filename(param_.snapshot_prefix());
   const int kBufferSize = 20;
   char iter_str_buffer[kBufferSize];
-  sprintf_s(iter_str_buffer, kBufferSize, "_iter_%d", iter_);
+  snprintf(iter_str_buffer, kBufferSize, "_iter_%d", iter_);
   return filename + iter_str_buffer + extension;
 }
 
@@ -732,7 +751,7 @@ void SGDSolver<Dtype>::SnapshotSolverStateToBinaryProto(
   }
   string snapshot_filename = Solver<Dtype>::SnapshotFilename(".solverstate");
   LOG(INFO)
-    << "Snapshotting solver state to binary proto file" << snapshot_filename;
+    << "Snapshotting solver state to binary proto file " << snapshot_filename;
   WriteProtoToBinaryFile(state, snapshot_filename.c_str());
 }
 
