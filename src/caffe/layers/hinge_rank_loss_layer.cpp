@@ -1,3 +1,11 @@
+/*!
+ *  \brief     The Caffe layer that implements the hinge rank loss described in the paper:
+ *  \version   1.0
+ *  \date      2015
+ *  \details   If you use this code, please consider citing our paper:
+ *             
+ */
+
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
